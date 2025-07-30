@@ -1,0 +1,43 @@
+# Core dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.21.0
+scipy>=1.7.0
+opencv-python>=4.5.0
+matplotlib>=3.5.0
+pillow>=8.3.0
+
+# Event processing
+loris>=0.3.0
+tonic>=1.4.0
+
+# Neuromorphic computing
+snntorch>=0.6.0
+norse>=0.0.7
+
+# Hardware acceleration
+cupy-cuda11x>=10.0.0
+
+# ROS2 (optional)
+rclpy>=3.0.0
+sensor-msgs>=4.0.0
+geometry-msgs>=4.0.0
+
+# Development and testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=5.0.0
+mypy>=0.991
+pre-commit>=2.20.0
+
+# Documentation
+sphinx>=5.0.0
+sphinx-rtd-theme>=1.0.0
+myst-parser>=0.18.0
+
+# Utilities
+tqdm>=4.64.0
+pyyaml>=6.0
+tensorboard>=2.10.0
+wandb>=0.13.0
