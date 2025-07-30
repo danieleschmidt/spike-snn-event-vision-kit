@@ -205,3 +205,39 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Neural network models and datasets
+*.pth
+*.onnx
+*.h5
+*.pb
+*.tflite
+*.net
+models/
+datasets/
+data/
+checkpoints/
+
+# Event camera data
+*.aedat
+*.dat
+*.es
+*.raw
+
+# CUDA/hardware specific
+*.cubin
+*.fatbin
+
+# ROS
+devel/
+build/
+install/
+.catkin_workspace
+
+# Mac
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+*~

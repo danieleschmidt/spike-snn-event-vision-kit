@@ -1,0 +1,67 @@
+/* Custom CSS for Spike-SNN Event Vision Kit documentation */
+
+/* Make code blocks more readable */
+.highlight {
+    background-color: #f8f8f8;
+    border: 1px solid #e1e4e5;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 12px 0;
+}
+
+/* Style for performance tables */
+.performance-table {
+    margin: 20px 0;
+}
+
+.performance-table th {
+    background-color: #404040;
+    color: white;
+    text-align: center;
+}
+
+.performance-table td {
+    text-align: center;
+    padding: 8px 12px;
+}
+
+/* Highlight important notes */
+.admonition.important {
+    border-left: 4px solid #ff6b6b;
+}
+
+.admonition.note {
+    border-left: 4px solid #4ecdc4;
+}
+
+.admonition.warning {
+    border-left: 4px solid #ffe66d;
+}
+
+/* Style for API documentation */
+.rst-content dl:not(.docutils) dt {
+    background-color: #f4f4f4;
+    color: #404040;
+    border-top: solid 3px #6ab0de;
+}
+
+/* Improve readability of parameters */
+.rst-content .field-list .field-name {
+    font-weight: bold;
+    color: #2980b9;
+}
+
+/* Style for code examples */
+.code-example {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.code-example-title {
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 8px;
+}
