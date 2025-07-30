@@ -1,0 +1,107 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spike-snn-event-vision-kit"
+version = "0.1.0"
+description = "Production-ready toolkit for event-camera object detection with spiking neural networks"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Daniel Schmidt", email = "daniel@example.com"}
+]
+keywords = ["neuromorphic", "spiking-neural-networks", "event-cameras", "computer-vision"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+requires-python = ">=3.8"
+dependencies = [
+    "torch>=1.12.0",
+    "torchvision>=0.13.0",
+    "numpy>=1.21.0",
+    "opencv-python>=4.5.0",
+    "matplotlib>=3.5.0",
+    "tqdm>=4.64.0",
+    "pyyaml>=6.0",
+    "tensorboard>=2.9.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "flake8>=5.0.0",
+    "mypy>=0.991",
+    "pre-commit>=2.20.0"
+]
+hardware = [
+    "nxsdk>=1.0.0",  # Intel Loihi (requires NRC membership)
+    "akida>=2.0.0"   # BrainChip Akida
+]
+ros = [
+    "rclpy>=3.0.0",
+    "sensor-msgs>=4.0.0",
+    "geometry-msgs>=4.0.0"
+]
+docs = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "sphinx-autodoc-typehints>=1.19.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/spike-snn-event-vision-kit"
+Documentation = "https://spike-snn-event-vision.readthedocs.io"
+Repository = "https://github.com/yourusername/spike-snn-event-vision-kit"
+Issues = "https://github.com/yourusername/spike-snn-event-vision-kit/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--cov=spike_snn_event --cov-report=html --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src/spike_snn_event"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError"
+]
