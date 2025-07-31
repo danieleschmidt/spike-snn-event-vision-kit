@@ -1,0 +1,49 @@
+# Code Owners for spike-snn-event-vision-kit
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners - these users will be requested for review on all PRs
+* @danieleschmidt
+
+# Core library code
+/src/spike_snn_event/ @danieleschmidt
+
+# Hardware backends - require specialized knowledge
+/src/spike_snn_event/hardware/ @danieleschmidt
+/src/spike_snn_event/backends/ @danieleschmidt
+
+# Training and models - ML expertise required
+/src/spike_snn_event/training/ @danieleschmidt
+/src/spike_snn_event/models/ @danieleschmidt
+
+# ROS2 integration - robotics expertise
+/src/spike_snn_event/ros/ @danieleschmidt
+
+# Build and packaging
+/pyproject.toml @danieleschmidt
+/requirements.txt @danieleschmidt
+/setup.py @danieleschmidt
+/Makefile @danieleschmidt
+
+# CI/CD and automation
+/.github/ @danieleschmidt
+/.pre-commit-config.yaml @danieleschmidt
+/docker/ @danieleschmidt
+
+# Documentation
+/docs/ @danieleschmidt
+/README.md @danieleschmidt
+/CONTRIBUTING.md @danieleschmidt
+/DEVELOPMENT.md @danieleschmidt
+
+# Security and compliance
+/SECURITY.md @danieleschmidt
+/.github/SECURITY.md @danieleschmidt
+
+# Test configuration
+/tests/ @danieleschmidt
+/pytest.ini @danieleschmidt
+/tox.ini @danieleschmidt
+
+# Examples and tutorials
+/examples/ @danieleschmidt
+/tutorials/ @danieleschmidt

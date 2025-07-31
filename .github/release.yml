@@ -1,0 +1,81 @@
+# GitHub Release Configuration for spike-snn-event-vision-kit
+# This file configures automatic release notes generation
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - dependencies
+      - duplicate
+      - question
+      - invalid
+      - wontfix
+    authors:
+      - dependabot
+      - github-actions[bot]
+
+  categories:
+    - title: 🚀 New Features
+      labels:
+        - feature
+        - enhancement
+        - new-feature
+
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+        - bugfix
+        - fix
+
+    - title: 🏗️ Hardware Support
+      labels:
+        - hardware
+        - hardware-support
+        - neuromorphic
+        - gpu
+        - loihi
+        - akida
+
+    - title: ⚡ Performance Improvements
+      labels:
+        - performance
+        - optimization
+        - speed
+
+    - title: 📚 Documentation
+      labels:
+        - documentation
+        - docs
+        - readme
+
+    - title: 🧪 Testing
+      labels:
+        - testing
+        - tests
+        - ci
+
+    - title: 🔧 Maintenance
+      labels:
+        - maintenance
+        - refactor
+        - cleanup
+        - chore
+
+    - title: 🔒 Security
+      labels:
+        - security
+        - vulnerability
+
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+        - dependency-update
+
+    - title: 🤖 ROS2 Integration
+      labels:
+        - ros2
+        - robotics
+
+    - title: Other Changes
+      labels:
+        - "*"

@@ -1,0 +1,124 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+README*
+CHANGELOG*
+LICENSE*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+.hypothesis/
+cover/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Jupyter
+.ipynb_checkpoints
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# CI/CD
+.github/
+.travis.yml
+.circleci/
+azure-pipelines.yml
+Jenkinsfile
+
+# Large files and data
+*.pth
+*.onnx
+*.h5
+*.pb
+*.tflite
+*.net
+models/
+datasets/
+data/
+checkpoints/
+*.aedat
+*.dat
+*.es
+*.raw
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Cache
+.cache/
+.mypy_cache/
+.ruff_cache/
+
+# Pre-commit
+.pre-commit-config.yaml
+
+# Package managers
+poetry.lock
+Pipfile.lock
+.pdm-python
+.pdm-build/

@@ -1,0 +1,83 @@
+# Prometheus configuration for spike-snn-event-vision-kit monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # SNN inference service metrics
+  - job_name: 'spike-snn-inference'
+    static_configs:
+      - targets: ['spike-snn-inference:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Hardware metrics (NVIDIA GPU)
+  - job_name: 'nvidia-gpu'
+    static_configs:
+      - targets: ['nvidia-gpu-exporter:9835']
+    scrape_interval: 5s
+
+  # System metrics (node exporter)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # Docker container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+
+  # ROS2 node metrics (if applicable)
+  - job_name: 'ros2-metrics'
+    static_configs:
+      - targets: ['spike-snn-ros2:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Event camera metrics
+  - job_name: 'event-camera'
+    static_configs:
+      - targets: ['event-camera-exporter:9200']
+    scrape_interval: 5s
+    metrics_path: '/metrics'
+
+  # Training job metrics
+  - job_name: 'training-metrics'
+    static_configs:
+      - targets: ['training-service:8002']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Model serving metrics
+  - job_name: 'model-serving'
+    static_configs:
+      - targets: ['model-server:8003']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Application-specific metrics
+  - job_name: 'snn-metrics'
+    static_configs:
+      - targets: ['spike-snn-app:8080']
+    metrics_path: '/api/metrics'
+    scrape_interval: 15s
+    honor_labels: true
+    params:
+      'format': ['prometheus']
