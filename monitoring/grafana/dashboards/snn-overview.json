@@ -1,0 +1,246 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "SNN Event Vision - Overview Dashboard",
+    "tags": ["spike-snn", "neuromorphic", "vision"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Inference Throughput",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(snn_inference_requests_total[5m])",
+            "legendFormat": "Requests/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "min": 0
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Inference Latency",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(snn_inference_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "min": 0
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "GPU Utilization",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "nvidia_gpu_utilization_gpu",
+            "legendFormat": "GPU %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Memory Usage",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "(nvidia_gpu_memory_used_bytes / nvidia_gpu_memory_total_bytes) * 100",
+            "legendFormat": "GPU Memory %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Event Processing Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(snn_events_processed_total[5m])",
+            "legendFormat": "Events/sec"
+          },
+          {
+            "expr": "rate(snn_events_received_total[5m])",
+            "legendFormat": "Events received/sec"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Events/sec",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Spike Activity",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "snn_spike_rate_hz",
+            "legendFormat": "Avg Spike Rate"
+          },
+          {
+            "expr": "snn_network_sparsity",
+            "legendFormat": "Network Sparsity"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Hz / Sparsity",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Detection Accuracy",
+        "type": "singlestat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "snn_detection_accuracy",
+            "legendFormat": "Accuracy"
+          }
+        ],
+        "valueMaps": [
+          {
+            "value": "null",
+            "text": "N/A"
+          }
+        ],
+        "format": "percent"
+      },
+      {
+        "id": 8,
+        "title": "Power Consumption",
+        "type": "singlestat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16},
+        "targets": [
+          {
+            "expr": "nvidia_gpu_power_watts",
+            "legendFormat": "GPU Power"
+          }
+        ],
+        "format": "watt"
+      },
+      {
+        "id": 9,
+        "title": "Temperature",
+        "type": "singlestat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "nvidia_gpu_temperature_celsius",
+            "legendFormat": "GPU Temp"
+          }
+        ],
+        "format": "celsius"
+      },
+      {
+        "id": 10,
+        "title": "System Load",
+        "type": "singlestat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 16},
+        "targets": [
+          {
+            "expr": "node_load1",
+            "legendFormat": "1m Load"
+          }
+        ],
+        "format": "short"
+      },
+      {
+        "id": 11,
+        "title": "Event Camera Status",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "event_camera_connected",
+            "legendFormat": "Connected",
+            "format": "table"
+          },
+          {
+            "expr": "event_camera_event_rate",
+            "legendFormat": "Event Rate",
+            "format": "table"
+          },
+          {
+            "expr": "event_camera_noise_level",
+            "legendFormat": "Noise Level",
+            "format": "table"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Model Performance",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "targets": [
+          {
+            "expr": "snn_model_accuracy",
+            "legendFormat": "Accuracy"
+          },
+          {
+            "expr": "snn_model_precision",
+            "legendFormat": "Precision"
+          },
+          {
+            "expr": "snn_model_recall",
+            "legendFormat": "Recall"
+          },
+          {
+            "expr": "snn_model_f1_score",
+            "legendFormat": "F1 Score"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Score",
+            "min": 0,
+            "max": 1
+          }
+        ]
+      }
+    ]
+  }
+}

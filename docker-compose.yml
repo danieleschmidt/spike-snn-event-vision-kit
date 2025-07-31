@@ -1,0 +1,208 @@
+version: '3.8'
+
+services:
+  # Development environment with Jupyter and debugging
+  spike-snn-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: spike-snn-dev
+    hostname: spike-snn-dev
+    volumes:
+      - .:/home/snnuser/spike-snn-event-vision-kit
+      - spike-snn-cache:/home/snnuser/.cache
+      - spike-snn-models:/home/snnuser/models
+      - spike-snn-data:/home/snnuser/data
+    ports:
+      - "8888:8888"  # Jupyter
+      - "6006:6006"  # TensorBoard
+      - "5678:5678"  # Python debugger
+      - "8080:8080"  # Development server
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - JUPYTER_ENABLE_LAB=yes
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    working_dir: /home/snnuser/spike-snn-event-vision-kit
+    command: >
+      bash -c "
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root 
+        --NotebookApp.token='' --NotebookApp.password='' 
+        --NotebookApp.allow_remote_access=True
+      "
+    restart: unless-stopped
+    networks:
+      - spike-snn-network
+
+  # Production inference service
+  spike-snn-inference:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: spike-snn-inference
+    hostname: spike-snn-inference
+    volumes:
+      - spike-snn-models:/home/snnuser/models:ro
+      - spike-snn-data:/home/snnuser/data:ro
+    ports:
+      - "8000:8000"  # Inference API
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_PATH=/home/snnuser/models
+      - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import spike_snn_event; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - spike-snn-network
+    profiles:
+      - production
+
+  # ROS2 integration service
+  spike-snn-ros2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ros2
+    container_name: spike-snn-ros2
+    hostname: spike-snn-ros2
+    volumes:
+      - spike-snn-models:/home/snnuser/models:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=42
+      - RMW_IMPLEMENTATION=rmw_cyclonedx_cpp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    network_mode: host
+    ipc: host
+    pid: host
+    restart: unless-stopped
+    profiles:
+      - ros2
+
+  # CPU-only service (for environments without GPU)
+  spike-snn-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cpu-only
+    container_name: spike-snn-cpu
+    hostname: spike-snn-cpu
+    volumes:
+      - spike-snn-models:/home/snnuser/models:ro
+      - spike-snn-data:/home/snnuser/data:ro
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - MODEL_PATH=/home/snnuser/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import spike_snn_event; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - spike-snn-network
+    profiles:
+      - cpu-only
+
+  # TensorBoard for monitoring
+  tensorboard:
+    image: tensorflow/tensorflow:latest
+    container_name: spike-snn-tensorboard
+    volumes:
+      - spike-snn-logs:/logs
+    ports:
+      - "6006:6006"
+    command: tensorboard --logdir=/logs --host=0.0.0.0 --port=6006
+    restart: unless-stopped
+    networks:
+      - spike-snn-network
+    profiles:
+      - monitoring
+
+  # Weights & Biases local instance (optional)
+  wandb-local:
+    image: wandb/local:latest
+    container_name: spike-snn-wandb
+    volumes:
+      - spike-snn-wandb:/vol
+    ports:
+      - "8080:8080"
+    environment:
+      - LOCAL_USERNAME=admin
+      - LOCAL_PASSWORD=admin
+      - LOCAL_RESTORE=false
+    restart: unless-stopped
+    networks:
+      - spike-snn-network
+    profiles:
+      - monitoring
+
+  # Event camera simulator (for testing without hardware)
+  event-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: spike-snn-simulator
+    volumes:
+      - spike-snn-data:/home/snnuser/data
+    ports:
+      - "9090:9090"  # Event stream endpoint
+    environment:
+      - SIMULATOR_MODE=dvs128
+      - EVENT_RATE=1000000  # 1M events/sec
+    command: python -m spike_snn_event.simulation.event_simulator
+    restart: unless-stopped
+    networks:
+      - spike-snn-network
+    profiles:
+      - simulation
+
+volumes:
+  spike-snn-cache:
+    driver: local
+  spike-snn-models:
+    driver: local
+  spike-snn-data:
+    driver: local
+  spike-snn-logs:
+    driver: local
+  spike-snn-wandb:
+    driver: local
+
+networks:
+  spike-snn-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

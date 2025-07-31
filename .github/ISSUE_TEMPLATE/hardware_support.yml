@@ -1,0 +1,138 @@
+name: Hardware Support Request
+description: Request support for new hardware or report hardware-specific issues
+title: "[HARDWARE] "
+labels: ["hardware", "enhancement", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest in expanding hardware support for spike-snn-event-vision-kit!
+        
+        This template is for requesting support for new hardware platforms or reporting hardware-specific issues.
+
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: Request Type
+      description: What type of hardware request is this?
+      options:
+        - New Event Camera Support
+        - New Neuromorphic Chip Support
+        - GPU/CUDA Issue
+        - Hardware Optimization
+        - Hardware-specific Bug
+        - Hardware Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: hardware-details
+    attributes:
+      label: Hardware Details
+      description: Provide detailed information about the hardware
+      placeholder: |
+        Hardware name: 
+        Manufacturer: 
+        Model/Version: 
+        Specifications: 
+        Documentation links:
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: How would you use this hardware with spike-snn-event-vision-kit?
+      placeholder: Describe your intended use case...
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-status
+    attributes:
+      label: Current Status
+      description: What's the current state of support for this hardware?
+      placeholder: |
+        - Does it work at all?
+        - What functionality is missing?
+        - Any workarounds you've tried?
+
+  - type: dropdown
+    id: hardware-category
+    attributes:
+      label: Hardware Category
+      description: Which category does this hardware belong to?
+      options:
+        - Event Camera (DVS, DAVIS, etc.)
+        - Neuromorphic Processor (Loihi, Akida, etc.)
+        - GPU/Accelerator
+        - FPGA
+        - Edge Device
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-requirements
+    attributes:
+      label: Technical Requirements
+      description: What technical details should we know about this hardware?
+      placeholder: |
+        - Required drivers or SDKs
+        - Special installation procedures
+        - Performance characteristics
+        - Power requirements
+        - Communication interfaces
+
+  - type: textarea
+    id: existing-software
+    attributes:
+      label: Existing Software Support
+      description: Are there existing libraries or tools that support this hardware?
+      placeholder: List any existing software, drivers, or libraries...
+
+  - type: checkboxes
+    id: availability
+    attributes:
+      label: Hardware Availability
+      description: Information about hardware availability
+      options:
+        - label: This hardware is commercially available
+        - label: I have access to this hardware for testing
+        - label: I can provide remote access to this hardware
+        - label: This hardware is research/prototype only
+
+  - type: textarea
+    id: implementation-notes
+    attributes:
+      label: Implementation Notes
+      description: Any technical notes or suggestions for implementation?
+      placeholder: Share any technical insights or suggestions...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: How can you help with this hardware support?
+      options:
+        - label: I can provide hardware for testing
+        - label: I can contribute code for this hardware
+        - label: I can provide documentation
+        - label: I can help with testing
+        - label: I have expertise with this hardware
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: This hardware is relevant to neuromorphic vision/SNN applications
+          required: true
+        - label: I have provided sufficient technical detail
+          required: true

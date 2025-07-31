@@ -1,0 +1,116 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "[FEATURE] "
+labels: ["enhancement", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature for spike-snn-event-vision-kit!
+        
+        Please provide as much detail as possible to help us understand and evaluate your request.
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of the feature you'd like to see
+      placeholder: Describe the feature...
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation and Use Case
+      description: Why would this feature be useful? What problem does it solve?
+      placeholder: Explain the motivation...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: How do you envision this feature working?
+      placeholder: Describe your proposed solution...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: Describe any alternatives...
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: Which category does this feature belong to?
+      options:
+        - Event Camera Support
+        - SNN Architecture
+        - Hardware Backend
+        - Training & Optimization
+        - Data Processing
+        - Visualization
+        - ROS2 Integration
+        - Performance
+        - Developer Experience
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - High - Critical for my use case
+        - Medium - Would be very helpful
+        - Low - Nice to have
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation-ideas
+    attributes:
+      label: Implementation Ideas
+      description: Do you have any thoughts on how this could be implemented?
+      placeholder: Share any implementation ideas...
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or References
+      description: Are there examples from other libraries or papers that demonstrate this feature?
+      placeholder: Provide examples or references...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be interested in contributing to this feature?
+      options:
+        - label: I would be willing to contribute to implementing this feature
+        - label: I would be willing to help with testing
+        - label: I would be willing to help with documentation
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues and feature requests to avoid duplicates
+          required: true
+        - label: This feature request is within the scope of spike-snn-event-vision-kit
+          required: true
+        - label: I have provided sufficient detail to understand the feature
+          required: true

@@ -1,0 +1,397 @@
+# CI/CD Pipeline Template for spike-snn-event-vision-kit
+# 
+# ⚠️  IMPORTANT: This is a TEMPLATE file for documentation purposes.
+# ⚠️  Copy this content to .github/workflows/ci.yml to enable CI/CD.
+# ⚠️  Do not commit actual workflow files to this repository.
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
+    inputs:
+      run_hardware_tests:
+        description: 'Run hardware tests'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHON_DEFAULT_VERSION: "3.10"
+  PYTORCH_VERSION: "2.0.0"
+  CUDA_VERSION: "11.8"
+
+jobs:
+  # Code Quality and Linting
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          
+      - name: Run pre-commit hooks
+        run: pre-commit run --all-files
+        
+      - name: Check code formatting with Black
+        run: black --check --diff src tests
+        
+      - name: Check import sorting with isort
+        run: isort --check-only --diff src tests
+        
+      - name: Lint with flake8
+        run: flake8 src tests
+        
+      - name: Type check with mypy
+        run: mypy src/spike_snn_event
+        continue-on-error: true  # Type checking is advisory
+
+  # Security Analysis
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml] safety
+          
+      - name: Run Bandit security scan
+        run: bandit -r src/ -f json -o bandit-report.json
+        continue-on-error: true
+        
+      - name: Run Safety dependency scan
+        run: safety check --json --output safety-report.json
+        continue-on-error: true
+        
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  # Test Matrix - CPU Only
+  test-cpu:
+    name: Test CPU (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        exclude:
+          # Reduce matrix size - skip some combinations
+          - os: windows-latest
+            python-version: "3.8"
+          - os: macos-latest
+            python-version: "3.8"
+            
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-${{ matrix.python-version }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.python-version }}-pip-
+            
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-dev
+          
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install opencv
+          
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install CPU-only PyTorch
+          pip install torch==${{ env.PYTORCH_VERSION }}+cpu torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+          
+      - name: Run unit tests
+        run: |
+          pytest tests/ -m "not gpu and not hardware" \
+            --cov=spike_snn_event \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --junitxml=test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml
+            
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_DEFAULT_VERSION
+        with:
+          file: ./coverage.xml
+          flags: cpu-tests
+          name: cpu-coverage
+
+  # GPU Tests (runs on self-hosted runner with GPU)
+  test-gpu:
+    name: Test GPU
+    runs-on: self-hosted-gpu  # You need to set up a self-hosted runner with GPU
+    if: github.event.inputs.run_hardware_tests == 'true' || contains(github.event.pull_request.labels.*.name, 'hardware')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          
+      - name: Install CUDA dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==${{ env.PYTORCH_VERSION }}+cu118 torchvision --index-url https://download.pytorch.org/whl/cu118
+          pip install cupy-cuda11x
+          pip install -e ".[dev,cuda]"
+          
+      - name: Verify GPU availability
+        run: |
+          python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+          python -c "import torch; print(f'CUDA devices: {torch.cuda.device_count()}')"
+          nvidia-smi
+          
+      - name: Run GPU tests
+        run: |
+          pytest tests/ -m "gpu" \
+            --cov=spike_snn_event \
+            --cov-report=xml \
+            --junitxml=gpu-test-results.xml
+            
+      - name: Upload GPU test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: gpu-test-results
+          path: gpu-test-results.xml
+
+  # Integration Tests
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [lint, test-cpu]
+    services:
+      # Add services needed for integration tests
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+          
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==${{ env.PYTORCH_VERSION }}+cpu torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+          
+      - name: Run integration tests
+        run: |
+          pytest tests/ -m "integration" \
+            --junitxml=integration-test-results.xml
+            
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: integration-test-results.xml
+
+  # Build Package
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [lint, test-cpu]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+          
+      - name: Build package
+        run: python -m build
+        
+      - name: Check package
+        run: twine check dist/*
+        
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-package
+          path: dist/
+
+  # Build Documentation
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[docs]"
+          
+      - name: Build documentation
+        run: |
+          cd docs
+          make html
+          
+      - name: Upload documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: docs/_build/html/
+
+  # Docker Build
+  docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [lint, test-cpu]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: your-dockerhub-username/spike-snn-event-vision-kit
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Notification
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [lint, security, test-cpu, integration, build, docs, docker]
+    if: always() && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+    steps:
+      - name: Notify Slack on success
+        if: ${{ needs.test-cpu.result == 'success' && needs.build.result == 'success' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "✅ CI/CD pipeline passed for ${{ github.ref }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          
+      - name: Notify Slack on failure
+        if: ${{ needs.test-cpu.result == 'failure' || needs.build.result == 'failure' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "❌ CI/CD pipeline failed for ${{ github.ref }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
