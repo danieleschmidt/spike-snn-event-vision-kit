@@ -1,0 +1,35 @@
+{
+  "sbom": {
+    "format": "spdx-json",
+    "version": "2.3",
+    "name": "spike-snn-event-vision-kit",
+    "supplier": "Organization: Terragon Labs",
+    "creators": [
+      "Tool: syft",
+      "Tool: cyclonedx-python"
+    ]
+  },
+  "generation": {
+    "includePackages": true,
+    "includeFiles": false,
+    "includeLicenses": true,
+    "includeVulnerabilities": true,
+    "catalogers": [
+      "python-package-cataloger",
+      "requirements-cataloger",
+      "pip-cataloger"
+    ]
+  },
+  "output": {
+    "formats": ["spdx-json", "cyclonedx-json"],
+    "destinations": [
+      "sbom.spdx.json",
+      "sbom.cyclonedx.json"
+    ]
+  },
+  "signing": {
+    "enabled": true,
+    "tool": "cosign",
+    "keyless": true
+  }
+}

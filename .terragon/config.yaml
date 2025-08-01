@@ -1,9 +1,9 @@
 scoring:
   weights:
-    advanced:
-      wsjf: 0.5
+    maturing:
+      wsjf: 0.6
       ice: 0.1
-      technicalDebt: 0.3
+      technicalDebt: 0.2
       security: 0.1
   
   thresholds:
@@ -44,6 +44,10 @@ execution:
     - securityViolation
 
 maturity:
-  level: "advanced"
-  score: 85
-  assessment_date: "2025-08-01T01:04:00Z"
+  level: "maturing"
+  score: 65
+  assessment_date: "2025-08-01T05:17:00Z"
+  repository: "spike-snn-event-vision-kit"
+  primary_language: "python"
+  framework: "pytorch"
+  domain: "neuromorphic-vision"
