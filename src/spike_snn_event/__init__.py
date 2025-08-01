@@ -12,3 +12,17 @@ except ImportError:
 __author__ = "Daniel Schmidt"
 __email__ = "daniel@example.com"
 __license__ = "MIT"
+
+# Core imports for easy access
+from .core import DVSCamera, EventPreprocessor, SpatioTemporalPreprocessor
+from .models import EventSNN, SpikingYOLO, CustomSNN, LIFNeuron
+
+__all__ = [
+    "DVSCamera",
+    "EventPreprocessor", 
+    "SpatioTemporalPreprocessor",
+    "EventSNN",
+    "SpikingYOLO",
+    "CustomSNN",
+    "LIFNeuron",
+]
