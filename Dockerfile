@@ -2,7 +2,7 @@
 # Optimized for development and production use
 
 # Base image with CUDA support
-FROM nvidia/cuda:11.8-devel-ubuntu22.04 as base
+FROM nvidia/cuda:12.9.1-devel-ubuntu22.04 as base
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
