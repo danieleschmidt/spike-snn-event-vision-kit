@@ -1,0 +1,169 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "SNN Training",
+            "type": "python",
+            "request": "launch",
+            "module": "spike_snn_event.cli",
+            "args": [
+                "train",
+                "--config", "configs/train_default.yaml",
+                "--debug"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "SNN Inference",
+            "type": "python",
+            "request": "launch",
+            "module": "spike_snn_event.cli",
+            "args": [
+                "detect",
+                "--model", "checkpoints/best_model.pth",
+                "--input", "data/test_events.aedat",
+                "--debug"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Benchmark Suite",
+            "type": "python",
+            "request": "launch",
+            "module": "spike_snn_event.cli",
+            "args": [
+                "benchmark",
+                "--dataset", "n-cars",
+                "--model", "spiking_yolo",
+                "--hardware", "cuda"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "PyTest: Current File",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-v",
+                "--tb=short"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "PyTest: All Tests",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/",
+                "-v",
+                "--tb=short",
+                "--cov=src/spike_snn_event",
+                "--cov-report=html"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Event Camera Stream Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/debug_camera_stream.py",
+            "args": [
+                "--camera", "simulation",
+                "--duration", "10"
+            ],
+            "console": "integratedTerminal", 
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "ROS2 SNN Node",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/spike_snn_event/ros/snn_detection_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "ROS_DOMAIN_ID": "0"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Docker: Attach to Container",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "/workspace"
+                }
+            ]
+        },
+        {
+            "name": "Neuromorphic Hardware Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/hardware_deployment.py",
+            "args": [
+                "--backend", "loihi",
+                "--model", "checkpoints/optimized_model.pth",
+                "--profile"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "LOIHI_ENABLED": "true"
+            },
+            "justMyCode": false
+        }
+    ]
+}

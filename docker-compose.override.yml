@@ -1,0 +1,172 @@
+# Override file for local development
+# This file extends docker-compose.yml with local development settings
+# Rename to docker-compose.override.yml to activate
+
+version: '3.8'
+
+services:
+  # Development service overrides
+  spike-snn-dev:
+    build:
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    volumes:
+      # Mount source code for live development
+      - .:/home/snnuser/spike-snn-event-vision-kit
+      # Mount local data directories
+      - ./models:/home/snnuser/models
+      - ./datasets:/home/snnuser/datasets
+      - ./data:/home/snnuser/data
+      - ./logs:/home/snnuser/logs
+      # Cache directories for faster rebuilds
+      - pip-cache:/home/snnuser/.cache/pip
+      - pre-commit-cache:/home/snnuser/.cache/pre-commit
+    environment:
+      # Development environment variables
+      - DEVELOPMENT_MODE=true
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=dev-token
+      # GPU configuration for development
+      - CUDA_VISIBLE_DEVICES=0
+      # Python development settings
+      - PYTHONPATH=/home/snnuser/spike-snn-event-vision-kit/src
+      - PYTHONASYNCIODEBUG=1
+    ports:
+      - "8888:8888"   # Jupyter Lab
+      - "8000:8000"   # Development API server
+      - "6006:6006"   # TensorBoard
+      - "5678:5678"   # Python debugger (debugpy)
+      - "3000:3000"   # Additional development server
+    # Enable GPU access for development
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # Override command to keep container running
+    command: >
+      bash -c "
+        echo 'Starting development environment...' &&
+        pip install -e '.[dev,cuda,monitoring,ros2]' &&
+        pre-commit install &&
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
+          --NotebookApp.token='dev-token' \
+          --NotebookApp.allow_remote_access=True \
+          --NotebookApp.allow_origin='*' &
+        echo 'Jupyter Lab started on http://localhost:8888' &&
+        echo 'Token: dev-token' &&
+        bash
+      "
+
+  # Local TensorBoard with more configuration
+  tensorboard:
+    image: tensorflow/tensorflow:latest
+    container_name: spike-snn-tensorboard-dev
+    volumes:
+      - ./logs/tensorboard:/logs:ro
+      - ./logs/wandb:/wandb:ro
+    ports:
+      - "6006:6006"
+    command: >
+      tensorboard 
+        --logdir=/logs 
+        --host=0.0.0.0 
+        --port=6006 
+        --reload_interval=5
+        --window_title="Spike-SNN Event Vision"
+    restart: unless-stopped
+
+  # Local Redis for caching (development)
+  redis-dev:
+    image: redis:7-alpine
+    container_name: spike-snn-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+
+  # Local PostgreSQL for experiment tracking (development)
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: spike-snn-postgres-dev
+    environment:
+      - POSTGRES_DB=spike_snn_experiments
+      - POSTGRES_USER=dev_user
+      - POSTGRES_PASSWORD=dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+  # MinIO for S3-compatible object storage (development)
+  minio-dev:
+    image: minio/minio:latest
+    container_name: spike-snn-minio-dev
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+      - MINIO_DEFAULT_BUCKETS=spike-snn-models,spike-snn-data,spike-snn-experiments
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  # Event camera simulator for development
+  event-simulator:
+    build:
+      context: .
+      target: development
+    container_name: spike-snn-simulator-dev
+    volumes:
+      - .:/home/snnuser/spike-snn-event-vision-kit
+      - ./data/simulation:/home/snnuser/data
+    ports:
+      - "9090:9090"   # Event stream WebSocket
+      - "9091:9091"   # Simulation control API
+    environment:
+      - SIMULATOR_MODE=dvs128
+      - EVENT_RATE=100000  # 100K events/sec for development
+      - NOISE_LEVEL=0.1
+      - SCENE_TYPE=moving_objects
+    command: >
+      bash -c "
+        python -m spike_snn_event.simulation.event_simulator \
+          --host 0.0.0.0 \
+          --port 9090 \
+          --api-port 9091 \
+          --mode dvs128
+      "
+    restart: unless-stopped
+
+# Additional volumes for development
+volumes:
+  pip-cache:
+    driver: local
+  pre-commit-cache:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  minio-data:
+    driver: local
+
+# Development network with custom subnet
+networks:
+  default:
+    name: spike-snn-dev-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

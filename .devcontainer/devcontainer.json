@@ -1,0 +1,106 @@
+{
+    "name": "Spike-SNN Event Vision Kit",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "dev",
+    "workspaceFolder": "/workspace",
+    "shutdownAction": "stopCompose",
+    
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.11",
+            "installTools": true
+        },
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/cuda:1": {
+            "version": "11.8"
+        }
+    },
+    
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.black-formatter",
+                "ms-python.flake8",
+                "ms-python.mypy-type-checker",
+                "ms-python.isort",
+                "ms-toolsai.jupyter",
+                "nvidia.nsight-vscode-edition",
+                "redhat.vscode-yaml",
+                "ms-vscode.makefile-tools",
+                "github.copilot",
+                "github.copilot-chat",
+                "ms-vscode.test-adapter-converter",
+                "littlefoxteam.vscode-python-test-adapter",
+                "formulahendry.code-runner",
+                "ms-vscode.live-server",
+                "bierner.markdown-mermaid",
+                "shd101wyy.markdown-preview-enhanced"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": false,
+                "python.linting.flake8Enabled": true,
+                "python.formatting.provider": "black",
+                "python.sortImports.provider": "isort",
+                "python.testing.pytestEnabled": true,
+                "python.testing.unittestEnabled": false,
+                "python.testing.pytestArgs": [
+                    "tests"
+                ],
+                "[python]": {
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": true
+                    }
+                },
+                "files.watcherExclude": {
+                    "**/models/**": true,
+                    "**/datasets/**": true,
+                    "**/data/**": true,
+                    "**/.git/**": true
+                },
+                "search.exclude": {
+                    "**/models": true,
+                    "**/datasets": true,
+                    "**/data": true
+                }
+            }
+        }
+    },
+    
+    "forwardPorts": [8000, 8080, 6006, 3000],
+    "portsAttributes": {
+        "8000": {
+            "label": "Web Server",
+            "onAutoForward": "notify"
+        },
+        "8080": {
+            "label": "Development Server",
+            "onAutoForward": "notify"
+        },
+        "6006": {
+            "label": "TensorBoard",
+            "onAutoForward": "notify"
+        },
+        "3000": {
+            "label": "Monitoring Dashboard",
+            "onAutoForward": "notify"
+        }
+    },
+    
+    "postCreateCommand": "bash .devcontainer/setup.sh",
+    "postStartCommand": "git config --global --add safe.directory /workspace",
+    
+    "mounts": [
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+    ],
+    
+    "remoteUser": "vscode",
+    "containerUser": "vscode"
+}
