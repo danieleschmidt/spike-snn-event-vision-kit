@@ -1,0 +1,205 @@
+{
+    "python.defaultInterpreterPath": "./venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    
+    // Linting and Formatting
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=88",
+        "--extend-ignore=E203,W503"
+    ],
+    "python.linting.mypyEnabled": true,
+    "python.linting.banditEnabled": true,
+    
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=88"
+    ],
+    
+    "python.sortImports.provider": "isort",
+    "isort.args": [
+        "--profile=black"
+    ],
+    
+    // Testing
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "tests",
+        "-v",
+        "--tb=short"
+    ],
+    "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    
+    // Auto-formatting and actions on save
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        }
+    },
+    
+    // YAML formatting
+    "[yaml]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.formatOnSave": true
+    },
+    
+    "[json]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.formatOnSave": true
+    },
+    
+    // Markdown
+    "[markdown]": {
+        "editor.wordWrap": "on",
+        "editor.quickSuggestions": false
+    },
+    
+    // File associations
+    "files.associations": {
+        "*.aedat": "plaintext",
+        "*.dat": "plaintext",
+        "*.es": "plaintext",
+        "*.pth": "plaintext",
+        "*.onnx": "plaintext",
+        "*.net": "plaintext"
+    },
+    
+    // File exclusions for performance
+    "files.watcherExclude": {
+        "**/models/**": true,
+        "**/datasets/**": true,
+        "**/data/**": true,
+        "**/checkpoints/**": true,
+        "**/.git/**": true,
+        "**/node_modules/**": true,
+        "**/__pycache__/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.mypy_cache/**": true,
+        "**/logs/**": true
+    },
+    
+    "search.exclude": {
+        "**/models": true,
+        "**/datasets": true,
+        "**/data": true,
+        "**/checkpoints": true,
+        "**/logs": true,
+        "**/__pycache__": true,
+        "**/.git": true,
+        "**/.vscode": true,
+        "**/node_modules": true
+    },
+    
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.mypy_cache": true,
+        "**/.ruff_cache": true
+    },
+    
+    // IntelliSense and Pylance settings
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.useLibraryCodeForTypes": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.stubPath": "./typings",
+    
+    // Neuromorphic-specific settings
+    "python.analysis.extraPaths": [
+        "./src",
+        "./tests"
+    ],
+    
+    // Git settings
+    "git.ignoreLimitWarning": true,
+    "git.detectSubmodules": false,
+    
+    // Terminal settings
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+    },
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+    },
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+    },
+    
+    // Jupyter settings
+    "jupyter.askForKernelRestart": false,
+    "jupyter.runStartupCommands": [
+        "%load_ext autoreload",
+        "%autoreload 2",
+        "import numpy as np",
+        "import torch",
+        "import matplotlib.pyplot as plt",
+        "plt.style.use('default')"
+    ],
+    
+    // CUDA and GPU development
+    "cuda-gdb.debuggerPath": "/usr/local/cuda/bin/cuda-gdb",
+    "nsight-vscode-edition.cuda-gdb-path": "/usr/local/cuda/bin/cuda-gdb",
+    
+    // Documentation and markdown
+    "markdown.preview.fontSize": 14,
+    "markdown.preview.lineHeight": 1.6,
+    
+    // Code navigation
+    "breadcrumbs.enabled": true,
+    "editor.minimap.enabled": false,
+    "editor.codeLens": true,
+    
+    // Performance optimizations
+    "editor.largeFileOptimizations": true,
+    "editor.suggest.localityBonus": true,
+    
+    // AI/ML specific extensions settings
+    "tensorBoard.logDirectory": "./logs/tensorboard",
+    
+    // Error and warning display
+    "problems.showCurrentInStatus": true,
+    "problems.sortOrder": "severity",
+    
+    // Spell checking (if extension installed)
+    "cSpell.words": [
+        "neuromorphic",
+        "spiking",
+        "aedat",
+        "prophesee",
+        "loihi",
+        "akida",
+        "snntorch",
+        "tonic",
+        "dvs",
+        "davis",
+        "pytorch",
+        "cuda",
+        "cudnn",
+        "tensorboard",
+        "wandb",
+        "onnx",
+        "proto",
+        "protobuf"
+    ],
+    
+    "cSpell.ignorePaths": [
+        "models/**",
+        "datasets/**", 
+        "data/**",
+        "checkpoints/**",
+        "logs/**",
+        "*.pth",
+        "*.onnx",
+        "*.h5"
+    ]
+}
