@@ -129,7 +129,7 @@ RUN echo "source /opt/ros/humble/setup.bash" >> /home/snnuser/.bashrc
 CMD ["bash", "-c", "source /opt/ros/humble/setup.bash && ros2 run spike_snn_event snn_detection_node"]
 
 # CPU-only stage (for environments without GPU)
-FROM ubuntu:22.04 as cpu-only
+FROM ubuntu:24.04 as cpu-only
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
