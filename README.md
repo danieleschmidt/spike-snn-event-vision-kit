@@ -34,7 +34,7 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/spike-snn-event-vision-kit.git
+git clone https://github.com/danieleschmidt/spike-snn-event-vision-kit.git
 cd spike-snn-event-vision-kit
 
 # Install dependencies
@@ -481,9 +481,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ```bibtex
 @software{spike_snn_event_vision_kit,
   title={Spike-SNN Event Vision Kit: Production-Ready Neuromorphic Vision},
-  author={Your Name},
+  author={Daniel Schmidt},
   year={2025},
-  url={https://github.com/yourusername/spike-snn-event-vision-kit}
+  url={https://github.com/danieleschmidt/spike-snn-event-vision-kit}
 }
 ```
 
