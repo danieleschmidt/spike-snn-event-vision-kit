@@ -6,10 +6,27 @@ event cameras and spiking neural networks in production environments.
 """
 
 import numpy as np
-from typing import Iterator, Tuple, Optional, Dict, Any
+from typing import Iterator, Tuple, Optional, Dict, Any, List, Union
 import time
 from pathlib import Path
+import cv2
+import threading
+from queue import Queue
+import logging
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
+
+@dataclass
+class CameraConfig:
+    """Configuration for event camera."""
+    width: int = 128
+    height: int = 128
+    noise_filter: bool = True
+    refractory_period: float = 1e-3
+    hot_pixel_threshold: int = 1000
+    background_activity_filter: bool = True
+    
 
 class DVSCamera:
     """Interface for DVS (Dynamic Vision Sensor) event cameras."""
@@ -17,12 +34,14 @@ class DVSCamera:
     def __init__(
         self,
         sensor_type: str = "DVS128",
-        noise_filter: bool = True,
-        refractory_period: float = 1e-3
+        config: Optional[CameraConfig] = None
     ):
         self.sensor_type = sensor_type
-        self.noise_filter = noise_filter
-        self.refractory_period = refractory_period
+        self.config = config or CameraConfig()
+        self.is_streaming = False
+        self._stream_thread = None
+        self._event_queue = Queue(maxsize=1000)
+        self.logger = logging.getLogger(__name__)
         
         # Sensor specifications
         self.sensor_specs = {
@@ -40,7 +59,41 @@ class DVSCamera:
         
         # State for filtering
         self.last_event_time = np.zeros((self.height, self.width))
+        self.pixel_event_count = np.zeros((self.height, self.width))
         
+        # Performance tracking
+        self.stats = {
+            'events_processed': 0,
+            'events_filtered': 0,
+            'frames_generated': 0
+        }
+        
+    def start_streaming(self, duration: Optional[float] = None):
+        """Start asynchronous event streaming."""
+        if self.is_streaming:
+            return
+            
+        self.is_streaming = True
+        self._stream_thread = threading.Thread(
+            target=self._stream_worker, 
+            args=(duration,),
+            daemon=True
+        )
+        self._stream_thread.start()
+        
+    def stop_streaming(self):
+        """Stop event streaming."""
+        self.is_streaming = False
+        if self._stream_thread:
+            self._stream_thread.join(timeout=1.0)
+            
+    def get_events(self, timeout: float = 0.1) -> Optional[np.ndarray]:
+        """Get next batch of events from queue."""
+        try:
+            return self._event_queue.get(timeout=timeout)
+        except:
+            return None
+            
     def stream(self, duration: Optional[float] = None) -> Iterator[np.ndarray]:
         """Stream events from camera (simulated for demo).
         
@@ -71,6 +124,30 @@ class DVSCamera:
                 
             time.sleep(0.01)  # 10ms between batches
             
+    def _stream_worker(self, duration: Optional[float] = None):
+        """Background thread for continuous event generation."""
+        start_time = time.time()
+        
+        while self.is_streaming:
+            if duration and (time.time() - start_time) > duration:
+                break
+                
+            # Generate events
+            num_events = np.random.poisson(50)
+            if num_events > 0:
+                events = self._generate_synthetic_events(num_events)
+                
+                if self.config.noise_filter:
+                    events = self._apply_noise_filter(events)
+                    
+                if len(events) > 0:
+                    try:
+                        self._event_queue.put_nowait(events)
+                    except:
+                        pass  # Queue full, skip batch
+                        
+            time.sleep(0.005)  # 5ms generation rate
+            
     def _generate_synthetic_events(self, num_events: int) -> np.ndarray:
         """Generate synthetic events for demonstration."""
         current_time = time.time()
@@ -87,7 +164,7 @@ class DVSCamera:
         return events
         
     def _apply_noise_filter(self, events: np.ndarray) -> np.ndarray:
-        """Apply refractory period noise filtering."""
+        """Apply comprehensive noise filtering."""
         if len(events) == 0:
             return events
             
@@ -97,13 +174,52 @@ class DVSCamera:
             x, y, t, p = int(event[0]), int(event[1]), event[2], event[3]
             
             # Check bounds
-            if 0 <= x < self.width and 0 <= y < self.height:
-                # Check refractory period
-                if t - self.last_event_time[y, x] > self.refractory_period:
-                    filtered_events.append(event)
-                    self.last_event_time[y, x] = t
+            if not (0 <= x < self.width and 0 <= y < self.height):
+                self.stats['events_filtered'] += 1
+                continue
+                
+            # Refractory period filter
+            if t - self.last_event_time[y, x] <= self.config.refractory_period:
+                self.stats['events_filtered'] += 1
+                continue
+                
+            # Hot pixel filter
+            self.pixel_event_count[y, x] += 1
+            if self.pixel_event_count[y, x] > self.config.hot_pixel_threshold:
+                self.stats['events_filtered'] += 1
+                continue
+                
+            # Background activity filter (optional)
+            if self.config.background_activity_filter:
+                # Simple spatial-temporal correlation check
+                neighborhood_activity = self._check_neighborhood_activity(x, y, t)
+                if neighborhood_activity < 0.1:  # Low correlation threshold
+                    self.stats['events_filtered'] += 1
+                    continue
+                    
+            filtered_events.append(event)
+            self.last_event_time[y, x] = t
+            self.stats['events_processed'] += 1
                     
         return np.array(filtered_events) if filtered_events else np.empty((0, 4))
+        
+    def _check_neighborhood_activity(
+        self, x: int, y: int, t: float, radius: int = 3
+    ) -> float:
+        """Check recent activity in spatial neighborhood."""
+        x_min = max(0, x - radius)
+        x_max = min(self.width, x + radius + 1)
+        y_min = max(0, y - radius)
+        y_max = min(self.height, y + radius + 1)
+        
+        recent_activity = self.last_event_time[y_min:y_max, x_min:x_max]
+        time_diff = t - recent_activity
+        
+        # Count recent events (within 5ms)
+        recent_count = np.sum(time_diff < 5e-3)
+        total_pixels = (x_max - x_min) * (y_max - y_min)
+        
+        return recent_count / total_pixels if total_pixels > 0 else 0.0
         
     def visualize_detections(
         self, 
@@ -128,6 +244,62 @@ class EventPreprocessor:
         raise NotImplementedError
         
 
+class EventVisualizer:
+    """Real-time event visualization utilities."""
+    
+    def __init__(self, width: int = 640, height: int = 480):
+        self.width = width
+        self.height = height
+        self.accumulation_image = np.zeros((height, width, 3), dtype=np.uint8)
+        self.decay_factor = 0.95
+        
+    def update(self, events: np.ndarray) -> np.ndarray:
+        """Update visualization with new events."""
+        # Decay existing events
+        self.accumulation_image = (self.accumulation_image * self.decay_factor).astype(np.uint8)
+        
+        if len(events) == 0:
+            return self.accumulation_image
+            
+        # Add new events
+        for event in events:
+            x, y, t, p = int(event[0]), int(event[1]), event[2], event[3]
+            if 0 <= x < self.width and 0 <= y < self.height:
+                if p > 0:  # Positive polarity - red
+                    self.accumulation_image[y, x, 2] = min(255, self.accumulation_image[y, x, 2] + 100)
+                else:  # Negative polarity - blue
+                    self.accumulation_image[y, x, 0] = min(255, self.accumulation_image[y, x, 0] + 100)
+                    
+        return self.accumulation_image
+        
+    def draw_detections(
+        self, 
+        image: np.ndarray, 
+        detections: List[Dict[str, Any]]
+    ) -> np.ndarray:
+        """Draw detection bounding boxes on image."""
+        vis_image = image.copy()
+        
+        for detection in detections:
+            bbox = detection.get('bbox', [0, 0, 10, 10])
+            confidence = detection.get('confidence', 0.0)
+            class_name = detection.get('class_name', 'unknown')
+            
+            x, y, w, h = map(int, bbox)
+            
+            # Draw bounding box
+            cv2.rectangle(vis_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            
+            # Draw label
+            label = f"{class_name}: {confidence:.2f}"
+            cv2.putText(
+                vis_image, label, (x, y - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1
+            )
+            
+        return vis_image
+
+
 class SpatioTemporalPreprocessor(EventPreprocessor):
     """Spatiotemporal preprocessing for event streams."""
     
@@ -138,7 +310,11 @@ class SpatioTemporalPreprocessor(EventPreprocessor):
     ):
         self.spatial_size = spatial_size
         self.time_bins = time_bins
-        self.hot_pixel_filter = HotPixelFilter(threshold=1000)
+        self.hot_pixel_filter = HotPixelFilter(
+            threshold=1000,
+            adaptive=True,
+            decay_rate=0.99
+        )
         
     def process(self, events: np.ndarray) -> np.ndarray:
         """Process events through spatiotemporal pipeline."""
@@ -165,6 +341,14 @@ class SpatioTemporalPreprocessor(EventPreprocessor):
         )
         
         return spike_trains
+        
+    def get_statistics(self) -> Dict[str, float]:
+        """Get preprocessing statistics."""
+        return {
+            'spatial_compression_ratio': np.prod(self.spatial_size) / (640 * 480),
+            'temporal_bins': self.time_bins,
+            'processing_efficiency': 1.0  # Placeholder
+        }
         
     def spatial_downsample(
         self, 
@@ -242,56 +426,134 @@ class SpatioTemporalPreprocessor(EventPreprocessor):
 
 
 class HotPixelFilter:
-    """Filter for removing hot pixels (noise)."""
+    """Advanced filter for removing hot pixels and noise."""
     
-    def __init__(self, threshold: int = 1000):
+    def __init__(
+        self, 
+        threshold: int = 1000,
+        adaptive: bool = True,
+        decay_rate: float = 0.99
+    ):
         self.threshold = threshold
+        self.adaptive = adaptive
+        self.decay_rate = decay_rate
         self.pixel_counts = {}
+        self.pixel_rates = {}
+        self.last_update_time = time.time()
         
     def __call__(self, events: np.ndarray) -> np.ndarray:
-        """Apply hot pixel filtering."""
+        """Apply adaptive hot pixel filtering."""
         if len(events) == 0:
             return events
             
+        current_time = time.time()
+        dt = current_time - self.last_update_time
+        
+        # Decay pixel counts over time
+        if self.adaptive and dt > 0.1:  # Update every 100ms
+            for pixel_key in list(self.pixel_counts.keys()):
+                self.pixel_counts[pixel_key] *= (self.decay_rate ** (dt * 10))
+                if self.pixel_counts[pixel_key] < 0.1:
+                    del self.pixel_counts[pixel_key]
+                    
+            self.last_update_time = current_time
+        
         filtered_events = []
         
         for event in events:
-            x, y = int(event[0]), int(event[1])
+            x, y, t, p = int(event[0]), int(event[1]), event[2], event[3]
             pixel_key = (x, y)
             
-            # Count events per pixel
+            # Update pixel activity
             self.pixel_counts[pixel_key] = self.pixel_counts.get(pixel_key, 0) + 1
             
+            # Calculate event rate for this pixel
+            if self.adaptive:
+                if pixel_key not in self.pixel_rates:
+                    self.pixel_rates[pixel_key] = []
+                    
+                self.pixel_rates[pixel_key].append(t)
+                
+                # Keep only recent events for rate calculation
+                recent_events = [et for et in self.pixel_rates[pixel_key] if t - et < 1.0]
+                self.pixel_rates[pixel_key] = recent_events
+                
+                event_rate = len(recent_events)  # Events per second
+                threshold = self.threshold
+                
+                # Adaptive threshold based on global activity
+                if len(events) > 100:  # High activity scene
+                    threshold *= 1.5
+            else:
+                event_rate = self.pixel_counts[pixel_key]
+                threshold = self.threshold
+            
             # Keep event if below threshold
-            if self.pixel_counts[pixel_key] <= self.threshold:
+            if event_rate <= threshold:
                 filtered_events.append(event)
                 
         return np.array(filtered_events) if filtered_events else np.empty((0, 4))
 
 
-def load_events_from_file(filepath: str) -> np.ndarray:
-    """Load events from file (various formats)."""
+def load_events_from_file(filepath: str) -> Tuple[np.ndarray, Optional[Dict]]:
+    """Load events from file with metadata."""
     filepath = Path(filepath)
+    metadata = None
     
     if filepath.suffix == '.npy':
-        return np.load(filepath)
+        events = np.load(filepath)
+        # Try to load metadata
+        metadata_path = filepath.with_suffix('.json')
+        if metadata_path.exists():
+            import json
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
     elif filepath.suffix == '.txt':
-        return np.loadtxt(filepath)
+        events = np.loadtxt(filepath)
+    elif filepath.suffix == '.h5':
+        try:
+            import h5py
+            with h5py.File(filepath, 'r') as f:
+                events = f['events'][:]
+                metadata = dict(f.attrs)
+        except ImportError:
+            raise ImportError("h5py required for HDF5 format")
     elif filepath.suffix == '.dat':
-        # Placeholder for binary format
-        raise NotImplementedError("DAT format not yet implemented")
+        # Basic binary format implementation
+        events = np.fromfile(filepath, dtype=np.float32).reshape(-1, 4)
     else:
         raise ValueError(f"Unsupported file format: {filepath.suffix}")
+        
+    return events, metadata
 
 
-def save_events_to_file(events: np.ndarray, filepath: str):
-    """Save events to file."""
+def save_events_to_file(events: np.ndarray, filepath: str, metadata: Optional[Dict] = None):
+    """Save events to file with optional metadata."""
     filepath = Path(filepath)
     
     if filepath.suffix == '.npy':
         np.save(filepath, events)
+        # Save metadata separately if provided
+        if metadata:
+            metadata_path = filepath.with_suffix('.json')
+            import json
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
     elif filepath.suffix == '.txt':
-        np.savetxt(filepath, events)
+        header = "# x y timestamp polarity"
+        if metadata:
+            header += f"\n# metadata: {metadata}"
+        np.savetxt(filepath, events, header=header)
+    elif filepath.suffix == '.h5':
+        try:
+            import h5py
+            with h5py.File(filepath, 'w') as f:
+                f.create_dataset('events', data=events)
+                if metadata:
+                    for key, value in metadata.items():
+                        f.attrs[key] = value
+        except ImportError:
+            raise ImportError("h5py required for HDF5 format")
     else:
         raise ValueError(f"Unsupported file format: {filepath.suffix}")
         
@@ -323,5 +585,54 @@ class EventDataset:
         
     def get_loaders(self, batch_size: int = 32, **kwargs):
         """Get data loaders for training."""
-        # TODO: Implement actual data loaders
-        return None, None
+        try:
+            import torch
+            from torch.utils.data import DataLoader, Dataset
+            
+            class SyntheticEventDataset(Dataset):
+                def __init__(self, size: int = 1000):
+                    self.size = size
+                    
+                def __len__(self):
+                    return self.size
+                    
+                def __getitem__(self, idx):
+                    # Generate synthetic event data
+                    num_events = np.random.randint(100, 1000)
+                    events = np.random.rand(num_events, 4)
+                    events[:, 0] *= 128  # x coordinates
+                    events[:, 1] *= 128  # y coordinates  
+                    events[:, 2] *= 0.1  # timestamps
+                    events[:, 3] = np.random.choice([-1, 1], num_events)  # polarity
+                    
+                    label = np.random.randint(0, 2)  # Binary classification
+                    
+                    return torch.tensor(events, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+            
+            dataset = SyntheticEventDataset()
+            train_size = int(0.8 * len(dataset))
+            val_size = len(dataset) - train_size
+            
+            train_dataset, val_dataset = torch.utils.data.random_split(
+                dataset, [train_size, val_size]
+            )
+            
+            train_loader = DataLoader(
+                train_dataset, 
+                batch_size=batch_size, 
+                shuffle=True,
+                num_workers=0  # Avoid multiprocessing issues
+            )
+            
+            val_loader = DataLoader(
+                val_dataset,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=0
+            )
+            
+            return train_loader, val_loader
+            
+        except ImportError:
+            print("PyTorch not available, returning None")
+            return None, None

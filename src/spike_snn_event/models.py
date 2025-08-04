@@ -7,8 +7,13 @@ optimized for event camera processing and neuromorphic vision tasks.
 
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple, List, Dict, Any
+import torch.nn.functional as F
+from typing import Optional, Tuple, List, Dict, Any, Callable
 import numpy as np
+import time
+import math
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 
 class LIFNeuron(nn.Module):
@@ -72,6 +77,15 @@ class LIFNeuron(nn.Module):
                 membrane = membrane * (~spike_mask).float()
                 
         return spikes
+    
+    def reset_state(self):
+        """Reset neuron state variables."""
+        # This will be called between sequences
+        pass
+        
+    def get_membrane_potential(self) -> torch.Tensor:
+        """Get current membrane potential (for analysis)."""
+        return getattr(self, '_last_membrane', torch.tensor(0.0))
 
 
 class SpikingConv2d(nn.Module):
@@ -125,15 +139,89 @@ class SpikingConv2d(nn.Module):
         spikes = spikes_flat.view(b, c, h, w, t)
         
         return spikes
+        
+    def set_time_constants(self, tau_mem: float, tau_syn: float):
+        """Update time constants during training."""
+        self.lif.tau_mem = tau_mem
+        self.lif.tau_syn = tau_syn
+        self.lif.alpha = torch.exp(torch.tensor(-self.lif.dt / tau_mem))
+        self.lif.beta = torch.exp(torch.tensor(-self.lif.dt / tau_syn))
+
+
+@dataclass
+class TrainingConfig:
+    """Configuration for SNN training."""
+    learning_rate: float = 1e-3
+    epochs: int = 100
+    batch_size: int = 32
+    early_stopping_patience: int = 10
+    gradient_clip_value: float = 1.0
+    loss_function: str = "cross_entropy"
+    optimizer: str = "adam"
+    weight_decay: float = 1e-4
+    lr_scheduler: str = "cosine"
+    surrogate_gradient: str = "fast_sigmoid"
+    
+
+class SurrogateGradient:
+    """Collection of surrogate gradient functions for spike training."""
+    
+    @staticmethod
+    def fast_sigmoid(input_tensor: torch.Tensor, alpha: float = 10.0) -> torch.Tensor:
+        """Fast sigmoid surrogate gradient."""
+        return 1.0 / (1.0 + alpha * torch.abs(input_tensor))
+        
+    @staticmethod
+    def straight_through_estimator(input_tensor: torch.Tensor) -> torch.Tensor:
+        """Straight-through estimator."""
+        return torch.ones_like(input_tensor)
+        
+    @staticmethod
+    def triangle(input_tensor: torch.Tensor, alpha: float = 1.0) -> torch.Tensor:
+        """Triangular surrogate gradient."""
+        return torch.clamp(alpha - torch.abs(input_tensor), min=0.0)
+        
+    @staticmethod
+    def arctan(input_tensor: torch.Tensor, alpha: float = 2.0) -> torch.Tensor:
+        """Arctangent surrogate gradient."""
+        return alpha / (math.pi * (1.0 + (alpha * input_tensor) ** 2))
+
+
+class SpikingLayer(nn.Module, ABC):
+    """Abstract base class for spiking layers."""
+    
+    def __init__(self):
+        super().__init__()
+        self.register_buffer('spike_count', torch.tensor(0.0))
+        self.register_buffer('total_neurons', torch.tensor(1.0))
+        
+    @abstractmethod
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        pass
+        
+    def get_firing_rate(self) -> float:
+        """Get average firing rate across layer."""
+        return (self.spike_count / (self.total_neurons + 1e-9)).item()
+        
+    def reset_statistics(self):
+        """Reset spike statistics."""
+        self.spike_count.zero_()
 
 
 class EventSNN(nn.Module):
     """Base class for event-based spiking neural networks."""
     
-    def __init__(self, input_size: Tuple[int, int] = (128, 128)):
+    def __init__(
+        self, 
+        input_size: Tuple[int, int] = (128, 128),
+        config: Optional[TrainingConfig] = None
+    ):
         super().__init__()
         self.input_size = input_size
         self.backend = "cpu"
+        self.config = config or TrainingConfig()
+        self.training_history = []
+        self.current_epoch = 0
         
     def set_backend(self, backend: str):
         """Set computational backend."""
@@ -180,6 +268,58 @@ class EventSNN(nn.Module):
             tensor[0, pol_idx, y[i], x[i], t_normalized[i]] += 1
             
         return tensor
+        
+    def compute_loss(
+        self, 
+        outputs: torch.Tensor, 
+        targets: torch.Tensor,
+        loss_type: str = "cross_entropy"
+    ) -> torch.Tensor:
+        """Compute training loss with SNN-specific regularization."""
+        if loss_type == "cross_entropy":
+            loss = F.cross_entropy(outputs, targets)
+        elif loss_type == "mse":
+            loss = F.mse_loss(outputs, targets)
+        elif loss_type == "spike_count":
+            # Custom loss that considers spike counts
+            ce_loss = F.cross_entropy(outputs, targets)
+            
+            # Add firing rate regularization
+            firing_rate_reg = 0.0
+            target_rate = 0.1  # 10% target firing rate
+            
+            for module in self.modules():
+                if isinstance(module, SpikingLayer):
+                    current_rate = module.get_firing_rate()
+                    firing_rate_reg += torch.abs(current_rate - target_rate)
+                    
+            loss = ce_loss + 0.01 * firing_rate_reg
+        else:
+            raise ValueError(f"Unknown loss type: {loss_type}")
+            
+        return loss
+        
+    def get_model_statistics(self) -> Dict[str, float]:
+        """Get model statistics for monitoring."""
+        stats = {
+            'total_parameters': sum(p.numel() for p in self.parameters()),
+            'trainable_parameters': sum(p.numel() for p in self.parameters() if p.requires_grad),
+            'total_spikes': 0.0,
+            'average_firing_rate': 0.0
+        }
+        
+        spike_count = 0
+        layer_count = 0
+        
+        for module in self.modules():
+            if isinstance(module, SpikingLayer):
+                spike_count += module.get_firing_rate()
+                layer_count += 1
+                
+        if layer_count > 0:
+            stats['average_firing_rate'] = spike_count / layer_count
+            
+        return stats
 
 
 class SpikingYOLO(EventSNN):
@@ -218,6 +358,8 @@ class SpikingYOLO(EventSNN):
         model = cls(**kwargs)
         model.set_backend(backend)
         # TODO: Load actual pretrained weights
+        # For now, return model with random weights
+        print(f"Loading pretrained model: {model_name} (placeholder - using random weights)")
         return model
         
     def detect(
@@ -330,3 +472,54 @@ class CustomSNN(EventSNN):
         """Export model for Intel Loihi deployment (placeholder)."""
         # TODO: Implement Loihi conversion
         print(f"Would export to Loihi format: {filepath}")
+        
+    def save_checkpoint(self, filepath: str, epoch: int, loss: float):
+        """Save training checkpoint."""
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': self.state_dict(),
+            'loss': loss,
+            'config': self.config.__dict__ if hasattr(self.config, '__dict__') else self.config,
+            'training_history': self.training_history
+        }
+        torch.save(checkpoint, filepath)
+        
+    def load_checkpoint(self, filepath: str):
+        """Load training checkpoint."""
+        checkpoint = torch.load(filepath, map_location=self.device)
+        self.load_state_dict(checkpoint['model_state_dict'])
+        self.current_epoch = checkpoint['epoch']
+        self.training_history = checkpoint.get('training_history', [])
+        return checkpoint['loss']
+        
+    @property
+    def device(self) -> torch.device:
+        """Get device of model parameters."""
+        return next(self.parameters()).device
+        
+    def profile_inference(self, sample_input: torch.Tensor) -> Dict[str, float]:
+        """Profile model inference performance."""
+        self.eval()
+        
+        # Warmup
+        with torch.no_grad():
+            for _ in range(10):
+                _ = self(sample_input)
+                
+        # Actual timing
+        times = []
+        with torch.no_grad():
+            for _ in range(100):
+                start_time = time.time()
+                _ = self(sample_input)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                times.append(time.time() - start_time)
+                
+        return {
+            'mean_latency_ms': np.mean(times) * 1000,
+            'std_latency_ms': np.std(times) * 1000,
+            'min_latency_ms': np.min(times) * 1000,
+            'max_latency_ms': np.max(times) * 1000,
+            'throughput_fps': 1.0 / np.mean(times)
+        }
