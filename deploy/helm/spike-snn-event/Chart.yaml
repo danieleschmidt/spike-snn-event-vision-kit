@@ -1,0 +1,31 @@
+apiVersion: v2
+name: spike-snn-event
+description: A Helm chart for Spike SNN Event Vision Kit
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - spiking-neural-networks
+  - event-vision
+  - neuromorphic
+  - machine-learning
+  - computer-vision
+home: https://github.com/danieleschmidt/spike-snn-event-vision-kit
+sources:
+  - https://github.com/danieleschmidt/spike-snn-event-vision-kit
+maintainers:
+  - name: Daniel Schmidt
+    email: daniel@example.com
+dependencies:
+  - name: nvidia-device-plugin
+    version: "0.14.1"
+    repository: https://nvidia.github.io/k8s-device-plugin
+    condition: gpu.enabled
+  - name: prometheus
+    version: "23.4.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+  - name: grafana
+    version: "6.60.4"
+    repository: https://grafana.github.io/helm-charts
+    condition: monitoring.grafana.enabled

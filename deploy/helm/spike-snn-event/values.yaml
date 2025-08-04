@@ -1,0 +1,240 @@
+# Default values for spike-snn-event
+# This is a YAML-formatted file.
+
+replicaCount: 3
+
+image:
+  repository: spike-snn-event
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+  metricsPort: 9090
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: api.spike-snn.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: spike-snn-tls
+      hosts:
+        - api.spike-snn.local
+
+resources:
+  limits:
+    memory: "8Gi"
+    cpu: "4000m"
+    nvidia.com/gpu: 1
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+    nvidia.com/gpu: 1
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  customMetrics:
+    - type: Pods
+      pods:
+        metric:
+          name: queue_size
+        target:
+          type: AverageValue
+          averageValue: "30"
+
+nodeSelector:
+  accelerator: nvidia-tesla-t4
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - spike-snn-event
+        topologyKey: kubernetes.io/hostname
+
+persistence:
+  enabled: true
+  storageClass: "ssd"
+  accessMode: ReadWriteOnce
+  size: 50Gi
+  mountPath: /app/models
+
+gpu:
+  enabled: true
+  count: 1
+  type: "nvidia-tesla-t4"
+
+config:
+  model:
+    name: "SpikingYOLO"
+    input_size: [128, 128]
+    num_classes: 80
+    backend: "cuda"
+  
+  inference:
+    batch_size: 8
+    max_queue_size: 100
+    timeout: 30.0
+    enable_caching: true
+  
+  scaling:
+    min_instances: 1
+    max_instances: 10
+    cpu_threshold: 70.0
+    memory_threshold: 80.0
+    queue_threshold: 50
+  
+  monitoring:
+    enable_metrics: true
+    metrics_port: 9090
+    log_level: "INFO"
+
+env:
+  - name: CUDA_VISIBLE_DEVICES
+    value: "0"
+  - name: LOG_LEVEL
+    valueFrom:
+      configMapKeyRef:
+        name: spike-snn-config
+        key: log_level
+  - name: MODEL_PATH
+    value: "/app/models"
+  - name: ENABLE_GPU
+    value: "true"
+
+probes:
+  readiness:
+    enabled: true
+    path: /health
+    port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  liveness:
+    enabled: true
+    path: /health
+    port: 8000
+    initialDelaySeconds: 60
+    periodSeconds: 30
+  startup:
+    enabled: true
+    path: /health
+    port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 30
+
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      labels: {}
+      interval: 30s
+      scrapeTimeout: 10s
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8000
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Training job configuration
+training:
+  enabled: false
+  image:
+    repository: spike-snn-event
+    tag: "training"
+  resources:
+    limits:
+      memory: "16Gi"
+      cpu: "8000m"
+      nvidia.com/gpu: 2
+    requests:
+      memory: "8Gi"
+      cpu: "4000m"
+      nvidia.com/gpu: 2
+  persistence:
+    enabled: true
+    storageClass: "ssd"
+    size: 100Gi
+  schedule: "0 2 * * *"  # Daily at 2 AM
+
+# ROS2 integration
+ros2:
+  enabled: false
+  image:
+    repository: spike-snn-event
+    tag: "ros2"
+  service:
+    type: ClusterIP
+    port: 11311
