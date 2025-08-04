@@ -42,10 +42,6 @@ dependencies = [
     "opencv-python>=4.5.0",
     "matplotlib>=3.5.0",
     "pillow>=8.3.0",
-    "loris>=0.3.0",
-    "tonic>=1.4.0",
-    "snntorch>=0.6.0",
-    "norse>=0.0.7",
     "tqdm>=4.64.0",
     "pyyaml>=6.0",
 ]
