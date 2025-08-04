@@ -220,10 +220,249 @@ class SpikingTrainer:
             
             # Training
             train_metrics = self.train_epoch(train_loader, epoch)
-            history['train_loss'].append(train_metrics['loss'])\n            history['train_accuracy'].append(train_metrics['accuracy'])\n            \n            # Validation\n            if val_loader:\n                val_metrics = self.validate_epoch(val_loader, epoch)\n                history['val_loss'].append(val_metrics['loss'])\n                history['val_accuracy'].append(val_metrics['accuracy'])\n                \n                # Early stopping check\n                if val_metrics['loss'] < self.best_val_loss:\n                    self.best_val_loss = val_metrics['loss']\n                    self.patience_counter = 0\n                    \n                    # Save best model\n                    if save_dir:\n                        best_model_path = save_dir / \"best_model.pth\"\n                        self.model.save_checkpoint(\n                            str(best_model_path),\n                            epoch,\n                            val_metrics['loss']\n                        )\n                else:\n                    self.patience_counter += 1\n                    \n                # Early stopping\n                if self.patience_counter >= self.config.early_stopping_patience:\n                    self.logger.info(f\"Early stopping at epoch {epoch}\")\n                    break\n                    \n            # Learning rate scheduling\n            if self.scheduler:\n                if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):\n                    if val_loader:\n                        self.scheduler.step(val_metrics['loss'])\n                else:\n                    self.scheduler.step()\n                    \n            # Record learning rate\n            current_lr = self.optimizer.param_groups[0]['lr']\n            history['learning_rate'].append(current_lr)\n            \n            # Logging\n            epoch_time = time.time() - start_time\n            log_msg = f\"Epoch {epoch:3d} | Time: {epoch_time:.1f}s | \"\n            log_msg += f\"Train Loss: {train_metrics['loss']:.4f} | \"\n            log_msg += f\"Train Acc: {train_metrics['accuracy']:.4f}\"\n            \n            if val_loader:\n                log_msg += f\" | Val Loss: {val_metrics['loss']:.4f} | \"\n                log_msg += f\"Val Acc: {val_metrics['accuracy']:.4f}\"\n                \n            log_msg += f\" | LR: {current_lr:.6f}\"\n            self.logger.info(log_msg)\n        \n        # Save final model and history\n        if save_dir:\n            final_model_path = save_dir / \"final_model.pth\"\n            self.model.save_checkpoint(\n                str(final_model_path),\n                epoch,\n                history['train_loss'][-1]\n            )\n            \n            # Save training history\n            history_path = save_dir / \"training_history.json\"\n            with open(history_path, 'w') as f:\n                json.dump(history, f, indent=2)\n                \n            # Save training plots\n            self.plot_training_history(history, save_dir / \"training_plots.png\")\n        \n        return history\n        \n    def plot_training_history(\n        self, \n        history: Dict[str, List[float]], \n        save_path: Optional[str] = None\n    ):\n        \"\"\"Plot training history.\"\"\"\n        fig, axes = plt.subplots(2, 2, figsize=(12, 8))\n        \n        # Loss plot\n        axes[0, 0].plot(history['train_loss'], label='Train Loss')\n        if 'val_loss' in history and history['val_loss']:\n            axes[0, 0].plot(history['val_loss'], label='Val Loss')\n        axes[0, 0].set_title('Loss')\n        axes[0, 0].set_xlabel('Epoch')\n        axes[0, 0].set_ylabel('Loss')\n        axes[0, 0].legend()\n        \n        # Accuracy plot\n        axes[0, 1].plot(history['train_accuracy'], label='Train Acc')\n        if 'val_accuracy' in history and history['val_accuracy']:\n            axes[0, 1].plot(history['val_accuracy'], label='Val Acc')\n        axes[0, 1].set_title('Accuracy')\n        axes[0, 1].set_xlabel('Epoch')\n        axes[0, 1].set_ylabel('Accuracy')\n        axes[0, 1].legend()\n        \n        # Learning rate plot\n        axes[1, 0].plot(history['learning_rate'])\n        axes[1, 0].set_title('Learning Rate')\n        axes[1, 0].set_xlabel('Epoch')\n        axes[1, 0].set_ylabel('Learning Rate')\n        axes[1, 0].set_yscale('log')\n        \n        # Model statistics (placeholder)\n        axes[1, 1].text(\n            0.1, 0.5, \n            \"Model Statistics\\n\" +\n            f\"Parameters: {sum(p.numel() for p in self.model.parameters()):,}\\n\" +\n            f\"Best Val Loss: {self.best_val_loss:.4f}\",\n            transform=axes[1, 1].transAxes,\n            fontsize=12,\n            verticalalignment='center'\n        )\n        axes[1, 1].set_title('Model Info')\n        axes[1, 1].axis('off')\n        \n        plt.tight_layout()\n        \n        if save_path:\n            plt.savefig(save_path, dpi=300, bbox_inches='tight')\n        plt.show()\n        \n    def evaluate(\n        self,\n        test_loader: DataLoader,\n        metrics: Optional[List[str]] = None\n    ) -> Dict[str, float]:\n        \"\"\"Evaluate model on test set.\"\"\"\n        self.model.eval()\n        \n        total_loss = 0.0\n        total_correct = 0\n        total_samples = 0\n        all_predictions = []\n        all_targets = []\n        \n        with torch.no_grad():\n            for data, targets in tqdm(test_loader, desc=\"Evaluating\"):\n                data, targets = data.to(self.device), targets.to(self.device)\n                \n                outputs = self.model(data)\n                loss = self.model.compute_loss(outputs, targets, self.config.loss_function)\n                \n                total_loss += loss.item()\n                \n                if targets.dim() == 1:  # Classification\n                    predicted = outputs.argmax(dim=1)\n                    total_correct += (predicted == targets).sum().item()\n                    all_predictions.extend(predicted.cpu().numpy())\n                    all_targets.extend(targets.cpu().numpy())\n                    \n                total_samples += targets.size(0)\n                \n        results = {\n            'loss': total_loss / len(test_loader),\n            'accuracy': total_correct / total_samples if total_samples > 0 else 0.0\n        }\n        \n        # Additional metrics\n        if metrics and len(all_predictions) > 0:\n            from sklearn.metrics import precision_score, recall_score, f1_score\n            \n            if 'precision' in metrics:\n                results['precision'] = precision_score(\n                    all_targets, all_predictions, average='weighted', zero_division=0\n                )\n            if 'recall' in metrics:\n                results['recall'] = recall_score(\n                    all_targets, all_predictions, average='weighted', zero_division=0\n                )\n            if 'f1' in metrics:\n                results['f1'] = f1_score(\n                    all_targets, all_predictions, average='weighted', zero_division=0\n                )\n                \n        return results
+            history['train_loss'].append(train_metrics['loss'])
+            history['train_accuracy'].append(train_metrics['accuracy'])
+            
+            # Validation
+            if val_loader:
+                val_metrics = self.validate_epoch(val_loader, epoch)
+                history['val_loss'].append(val_metrics['loss'])
+                history['val_accuracy'].append(val_metrics['accuracy'])
+                
+                # Early stopping check
+                if val_metrics['loss'] < self.best_val_loss:
+                    self.best_val_loss = val_metrics['loss']
+                    self.patience_counter = 0
+                    
+                    # Save best model
+                    if save_dir:
+                        best_model_path = save_dir / "best_model.pth"
+                        self.model.save_checkpoint(
+                            str(best_model_path),
+                            epoch,
+                            val_metrics['loss']
+                        )
+                else:
+                    self.patience_counter += 1
+                    
+                # Early stopping
+                if self.patience_counter >= self.config.early_stopping_patience:
+                    self.logger.info(f"Early stopping at epoch {epoch}")
+                    break
+                    
+            # Learning rate scheduling
+            if self.scheduler:
+                if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                    if val_loader:
+                        self.scheduler.step(val_metrics['loss'])
+                else:
+                    self.scheduler.step()
+                    
+            # Record learning rate
+            current_lr = self.optimizer.param_groups[0]['lr']
+            history['learning_rate'].append(current_lr)
+            
+            # Logging
+            epoch_time = time.time() - start_time
+            log_msg = f"Epoch {epoch:3d} | Time: {epoch_time:.1f}s | "
+            log_msg += f"Train Loss: {train_metrics['loss']:.4f} | "
+            log_msg += f"Train Acc: {train_metrics['accuracy']:.4f}"
+            
+            if val_loader:
+                log_msg += f" | Val Loss: {val_metrics['loss']:.4f} | "
+                log_msg += f"Val Acc: {val_metrics['accuracy']:.4f}"
+                
+            log_msg += f" | LR: {current_lr:.6f}"
+            self.logger.info(log_msg)
+        
+        # Save final model and history
+        if save_dir:
+            final_model_path = save_dir / "final_model.pth"
+            self.model.save_checkpoint(
+                str(final_model_path),
+                epoch,
+                history['train_loss'][-1]
+            )
+            
+            # Save training history
+            history_path = save_dir / "training_history.json"
+            with open(history_path, 'w') as f:
+                json.dump(history, f, indent=2)
+                
+            # Save training plots
+            self.plot_training_history(history, save_dir / "training_plots.png")
+        
+        return history
+        
+    def plot_training_history(
+        self, 
+        history: Dict[str, List[float]], 
+        save_path: Optional[str] = None
+    ):
+        """Plot training history."""
+        fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+        
+        # Loss plot
+        axes[0, 0].plot(history['train_loss'], label='Train Loss')
+        if 'val_loss' in history and history['val_loss']:
+            axes[0, 0].plot(history['val_loss'], label='Val Loss')
+        axes[0, 0].set_title('Loss')
+        axes[0, 0].set_xlabel('Epoch')
+        axes[0, 0].set_ylabel('Loss')
+        axes[0, 0].legend()
+        
+        # Accuracy plot
+        axes[0, 1].plot(history['train_accuracy'], label='Train Acc')
+        if 'val_accuracy' in history and history['val_accuracy']:
+            axes[0, 1].plot(history['val_accuracy'], label='Val Acc')
+        axes[0, 1].set_title('Accuracy')
+        axes[0, 1].set_xlabel('Epoch')
+        axes[0, 1].set_ylabel('Accuracy')
+        axes[0, 1].legend()
+        
+        # Learning rate plot
+        axes[1, 0].plot(history['learning_rate'])
+        axes[1, 0].set_title('Learning Rate')
+        axes[1, 0].set_xlabel('Epoch')
+        axes[1, 0].set_ylabel('Learning Rate')
+        axes[1, 0].set_yscale('log')
+        
+        # Model statistics (placeholder)
+        axes[1, 1].text(
+            0.1, 0.5, 
+            "Model Statistics\n" +
+            f"Parameters: {sum(p.numel() for p in self.model.parameters()):,}\n" +
+            f"Best Val Loss: {self.best_val_loss:.4f}",
+            transform=axes[1, 1].transAxes,
+            fontsize=12,
+            verticalalignment='center'
+        )
+        axes[1, 1].set_title('Model Info')
+        axes[1, 1].axis('off')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+        
+    def evaluate(
+        self,
+        test_loader: DataLoader,
+        metrics: Optional[List[str]] = None
+    ) -> Dict[str, float]:
+        """Evaluate model on test set."""
+        self.model.eval()
+        
+        total_loss = 0.0
+        total_correct = 0
+        total_samples = 0
+        all_predictions = []
+        all_targets = []
+        
+        with torch.no_grad():
+            for data, targets in tqdm(test_loader, desc="Evaluating"):
+                data, targets = data.to(self.device), targets.to(self.device)
+                
+                outputs = self.model(data)
+                loss = self.model.compute_loss(outputs, targets, self.config.loss_function)
+                
+                total_loss += loss.item()
+                
+                if targets.dim() == 1:  # Classification
+                    predicted = outputs.argmax(dim=1)
+                    total_correct += (predicted == targets).sum().item()
+                    all_predictions.extend(predicted.cpu().numpy())
+                    all_targets.extend(targets.cpu().numpy())
+                    
+                total_samples += targets.size(0)
+                
+        results = {
+            'loss': total_loss / len(test_loader),
+            'accuracy': total_correct / total_samples if total_samples > 0 else 0.0
+        }
+        
+        # Additional metrics
+        if metrics and len(all_predictions) > 0:
+            from sklearn.metrics import precision_score, recall_score, f1_score
+            
+            if 'precision' in metrics:
+                results['precision'] = precision_score(
+                    all_targets, all_predictions, average='weighted', zero_division=0
+                )
+            if 'recall' in metrics:
+                results['recall'] = recall_score(
+                    all_targets, all_predictions, average='weighted', zero_division=0
+                )
+            if 'f1' in metrics:
+                results['f1'] = f1_score(
+                    all_targets, all_predictions, average='weighted', zero_division=0
+                )
+                
+        return results
 
 
-class EventDataLoader:\n    \"\"\"Specialized data loader for event-based datasets.\"\"\"\n    \n    @staticmethod\n    def create_loaders(\n        dataset_name: str,\n        batch_size: int = 32,\n        split_ratio: Tuple[float, float, float] = (0.7, 0.15, 0.15),\n        **kwargs\n    ) -> Tuple[DataLoader, DataLoader, DataLoader]:\n        \"\"\"Create train/val/test data loaders.\"\"\"\n        \n        if dataset_name == \"synthetic\":\n            from .core import EventDataset\n            dataset = EventDataset.load(\"N-CARS\")\n            train_loader, val_loader = dataset.get_loaders(batch_size=batch_size)\n            \n            # Create test loader (same as val for now)\n            test_loader = val_loader\n            \n            return train_loader, val_loader, test_loader\n        else:\n            raise ValueError(f\"Unknown dataset: {dataset_name}\")\n            \n    @staticmethod\n    def collate_events(batch: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor]:\n        \"\"\"Custom collate function for variable-length event sequences.\"\"\"\n        events_list, labels_list = zip(*batch)\n        \n        # Pad event sequences to same length\n        max_events = max(events.shape[0] for events in events_list)\n        \n        padded_events = []\n        for events in events_list:\n            if events.shape[0] < max_events:\n                padding = torch.zeros(max_events - events.shape[0], events.shape[1])\n                events = torch.cat([events, padding], dim=0)\n            padded_events.append(events)\n            \n        events_batch = torch.stack(padded_events)\n        labels_batch = torch.stack(labels_list)\n        \n        return events_batch, labels_batch
+class EventDataLoader:
+    """Specialized data loader for event-based datasets."""
+    
+    @staticmethod
+    def create_loaders(
+        dataset_name: str,
+        batch_size: int = 32,
+        split_ratio: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+        **kwargs
+    ) -> Tuple[DataLoader, DataLoader, DataLoader]:
+        """Create train/val/test data loaders."""
+        
+        if dataset_name == "synthetic":
+            from .core import EventDataset
+            dataset = EventDataset.load("N-CARS")
+            train_loader, val_loader = dataset.get_loaders(batch_size=batch_size)
+            
+            # Create test loader (same as val for now)
+            test_loader = val_loader
+            
+            return train_loader, val_loader, test_loader
+        else:
+            raise ValueError(f"Unknown dataset: {dataset_name}")
+            
+    @staticmethod
+    def collate_events(batch: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Custom collate function for variable-length event sequences."""
+        events_list, labels_list = zip(*batch)
+        
+        # Pad event sequences to same length
+        max_events = max(events.shape[0] for events in events_list)
+        
+        padded_events = []
+        for events in events_list:
+            if events.shape[0] < max_events:
+                padding = torch.zeros(max_events - events.shape[0], events.shape[1])
+                events = torch.cat([events, padding], dim=0)
+            padded_events.append(events)
+            
+        events_batch = torch.stack(padded_events)
+        labels_batch = torch.stack(labels_list)
+        
+        return events_batch, labels_batch
 
 
-def create_training_config(\n    learning_rate: float = 1e-3,\n    epochs: int = 100,\n    batch_size: int = 32,\n    **kwargs\n) -> TrainingConfig:\n    \"\"\"Create training configuration with sensible defaults.\"\"\"\n    config = TrainingConfig(\n        learning_rate=learning_rate,\n        epochs=epochs,\n        batch_size=batch_size\n    )\n    \n    # Update with any additional kwargs\n    for key, value in kwargs.items():\n        if hasattr(config, key):\n            setattr(config, key, value)\n            \n    return config\n
+def create_training_config(
+    learning_rate: float = 1e-3,
+    epochs: int = 100,
+    batch_size: int = 32,
+    **kwargs
+) -> TrainingConfig:
+    """Create training configuration with sensible defaults."""
+    config = TrainingConfig(
+        learning_rate=learning_rate,
+        epochs=epochs,
+        batch_size=batch_size
+    )
+    
+    # Update with any additional kwargs
+    for key, value in kwargs.items():
+        if hasattr(config, key):
+            setattr(config, key, value)
+            
+    return config
