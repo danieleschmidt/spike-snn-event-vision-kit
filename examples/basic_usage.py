@@ -1,348 +1,352 @@
 #!/usr/bin/env python3
 """
-Basic usage examples for Spike SNN Event Vision Kit.
+Basic Usage Example for Spike-SNN Event Vision Kit
 
-This script demonstrates the fundamental capabilities of the toolkit including:
-- Event camera setup and streaming
-- Basic event processing
-- SNN model inference
-- Visualization
+This example demonstrates:
+1. Event camera setup and streaming
+2. Basic spiking neural network inference
+3. Real-time event processing
+4. Detection visualization
+
+Run with: python examples/basic_usage.py
 """
 
-import numpy as np
+import sys
 import time
-import logging
+import numpy as np
 from pathlib import Path
 
-# Import the spike-snn-event toolkit
-import spike_snn_event as snn
+# Add the source directory to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
+from spike_snn_event import (
+    DVSCamera, 
+    EventDataset,
+    SpatioTemporalPreprocessor,
+    EventVisualizer,
+    PYTORCH_MODELS_AVAILABLE
+)
+
+if PYTORCH_MODELS_AVAILABLE:
+    from spike_snn_event import SpikingYOLO, CustomSNN
 
 
-def example_1_basic_camera_setup():
-    """Example 1: Basic event camera setup and streaming."""
-    logger.info("=== Example 1: Basic Camera Setup ===")
+def basic_event_detection_demo():
+    """Demonstrate basic event-based object detection."""
+    print("🚀 Basic Event Detection Demo")
+    print("=" * 50)
     
-    # Create DVS camera instance
-    camera = snn.DVSCamera(sensor_type="DVS128")
+    if not PYTORCH_MODELS_AVAILABLE:
+        print("⚠️  PyTorch models not available, skipping neural network demo")
+        return
     
-    # Configure camera settings
-    config = snn.CameraConfig(
-        width=128,
-        height=128,
+    # 1. Initialize event camera
+    print("📷 Initializing DVS camera...")
+    camera = DVSCamera(
+        sensor_type="DVS128",
         noise_filter=True,
-        refractory_period=1e-3,
-        hot_pixel_threshold=1000
+        refractory_period=1e-3  # 1ms refractory period
     )
-    camera.config = config
     
-    # Start streaming and collect some events
-    logger.info("Starting event stream...")
-    event_count = 0
+    # 2. Load pre-trained spiking YOLO model
+    print("🧠 Loading pre-trained Spiking YOLO model...")
+    model = SpikingYOLO.from_pretrained(
+        "yolo_v4_spiking_dvs",
+        backend="cpu",  # Use CPU for compatibility
+        time_steps=10
+    )
     
-    for events in camera.stream(duration=2.0):  # Stream for 2 seconds
-        if len(events) > 0:
-            event_count += len(events)
-            logger.info(f"Received batch of {len(events)} events")
+    # 3. Setup event visualizer
+    visualizer = EventVisualizer(width=640, height=480)
+    
+    print("\n🎬 Starting event detection (10 seconds)...")
+    print("Real-time statistics:")
+    
+    # 4. Real-time detection loop
+    total_events = 0
+    total_detections = 0
+    start_time = time.time()
+    
+    for frame_idx, events in enumerate(camera.stream(duration=10.0)):
+        if len(events) == 0:
+            continue
             
-            # Print first few events for inspection
-            if event_count < 100:
-                print(f"Sample events: {events[:3]}")
-    
-    logger.info(f"Total events collected: {event_count}")
-    logger.info("Camera streaming completed\n")
-
-
-def example_2_event_preprocessing():
-    """Example 2: Event preprocessing and filtering."""
-    logger.info("=== Example 2: Event Preprocessing ===")
-    
-    # Create synthetic event data for demonstration
-    num_events = 1000
-    events = np.random.rand(num_events, 4)
-    events[:, 0] *= 128  # x coordinates (0-128)
-    events[:, 1] *= 128  # y coordinates (0-128)
-    events[:, 2] = np.sort(np.random.rand(num_events) * 0.1)  # sorted timestamps
-    events[:, 3] = np.random.choice([-1, 1], num_events)  # polarity
-    
-    logger.info(f"Created {len(events)} synthetic events")
-    
-    # Initialize preprocessor
-    preprocessor = snn.SpatioTemporalPreprocessor(
-        spatial_size=(64, 64),  # Downsample to 64x64
-        time_bins=10
-    )
-    
-    # Process events
-    logger.info("Processing events...")
-    processed_events = preprocessor.process(events)
-    
-    logger.info(f"Processed events shape: {processed_events.shape}")
-    
-    # Get processing statistics
-    stats = preprocessor.get_statistics()
-    logger.info(f"Processing stats: {stats}")
-    logger.info("Event preprocessing completed\n")
-
-
-def example_3_snn_inference():
-    """Example 3: SNN model inference."""
-    logger.info("=== Example 3: SNN Model Inference ===")
-    
-    try:
-        # Create a simple SNN model
-        model = snn.CustomSNN(
-            input_size=(128, 128),
-            hidden_channels=[32, 64],
-            output_classes=2,
-            neuron_type="LIF"
-        )
+        total_events += len(events)
         
-        logger.info(f"Created SNN model with {sum(p.numel() for p in model.parameters())} parameters")
-        
-        # Generate synthetic event data
-        events = np.random.rand(500, 4)
-        events[:, 0] *= 128
-        events[:, 1] *= 128
-        events[:, 2] = np.sort(np.random.rand(500) * 0.05)
-        events[:, 3] = np.random.choice([-1, 1], 500)
-        
-        # Convert events to tensor format
-        event_tensor = model.events_to_tensor(events, time_window=5e-3)
-        logger.info(f"Event tensor shape: {event_tensor.shape}")
-        
-        # Run inference
-        logger.info("Running inference...")
-        model.eval()
-        
-        import torch
-        with torch.no_grad():
-            output = model(event_tensor)
-            prediction = torch.softmax(output, dim=1)
-        
-        logger.info(f"Model output: {output}")
-        logger.info(f"Predictions: {prediction}")
-        
-        # Get model statistics
-        stats = model.get_model_statistics()
-        logger.info(f"Model stats: {stats}")
-        
-    except ImportError:
-        logger.warning("PyTorch not available, skipping SNN inference example")
-    
-    logger.info("SNN inference completed\n")
-
-
-def example_4_yolo_detection():
-    """Example 4: Event-based object detection with SpikingYOLO."""
-    logger.info("=== Example 4: SpikingYOLO Detection ===")
-    
-    try:
-        # Create SpikingYOLO model
-        yolo_model = snn.SpikingYOLO(
-            input_size=(128, 128),
-            num_classes=10,
-            time_steps=10
-        )
-        yolo_model.set_backend("cpu")  # Use CPU for this example
-        
-        logger.info("Created SpikingYOLO model")
-        
-        # Generate synthetic event data
-        events = np.random.rand(1000, 4)
-        events[:, 0] *= 128
-        events[:, 1] *= 128
-        events[:, 2] = np.sort(np.random.rand(1000) * 0.1)
-        events[:, 3] = np.random.choice([-1, 1], 1000)
-        
-        # Run detection
-        logger.info("Running object detection...")
-        detections = yolo_model.detect(
+        # Run spiking inference
+        detections = model.detect(
             events,
             integration_time=10e-3,  # 10ms integration window
-            threshold=0.3
+            threshold=0.5
         )
         
-        logger.info(f"Found {len(detections)} detections")
-        for i, detection in enumerate(detections):
-            logger.info(f"Detection {i}: {detection}")
+        total_detections += len(detections)
         
-        logger.info(f"Inference time: {yolo_model.last_inference_time:.2f}ms")
+        # Update visualization
+        vis_image = visualizer.update(events)
+        vis_image = visualizer.draw_detections(vis_image, detections)
         
-    except ImportError:
-        logger.warning("PyTorch not available, skipping YOLO detection example")
+        # Print statistics every 10 frames
+        if frame_idx % 10 == 0:
+            elapsed = time.time() - start_time
+            fps = frame_idx / elapsed if elapsed > 0 else 0
+            
+            print(f"Frame {frame_idx:3d} | "
+                  f"Events: {len(events):4d} | "
+                  f"Detections: {len(detections):2d} | "
+                  f"Latency: {model.last_inference_time:.1f}ms | "
+                  f"FPS: {fps:.1f}")
     
-    logger.info("YOLO detection completed\n")
+    # Final statistics
+    total_time = time.time() - start_time
+    print(f"\n📊 Final Statistics:")
+    print(f"   Total runtime:    {total_time:.1f}s")
+    print(f"   Total events:     {total_events:,}")
+    print(f"   Total detections: {total_detections}")
+    print(f"   Events/second:    {total_events / total_time:.0f}")
+    print(f"   Detection rate:   {total_detections / total_time:.1f}/s")
 
 
-def example_5_visualization():
-    """Example 5: Event visualization."""
-    logger.info("=== Example 5: Event Visualization ===")
+def custom_snn_training_demo():
+    """Demonstrate training a custom SNN on synthetic data."""
+    print("\n🧪 Custom SNN Training Demo")
+    print("=" * 50)
     
-    # Create visualizer
-    visualizer = snn.EventVisualizer(width=128, height=128)
+    if not PYTORCH_MODELS_AVAILABLE:
+        print("⚠️  PyTorch models not available, skipping training demo")
+        return
     
-    # Generate events for visualization
-    events = np.random.rand(200, 4)
-    events[:, 0] *= 128
-    events[:, 1] *= 128
-    events[:, 2] = np.sort(np.random.rand(200) * 0.01)
-    events[:, 3] = np.random.choice([-1, 1], 200)
+    # 1. Create custom SNN model
+    print("🧠 Creating custom SNN model...")
+    model = CustomSNN(
+        input_size=(128, 128),
+        hidden_channels=[64, 128, 256],
+        output_classes=2,  # Binary classification
+        neuron_type="LIF",
+        surrogate_gradient="fast_sigmoid"
+    )
     
-    logger.info(f"Visualizing {len(events)} events")
+    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
-    # Update visualization
-    vis_image = visualizer.update(events)
-    logger.info(f"Generated visualization image with shape: {vis_image.shape}")
+    # 2. Load synthetic dataset
+    print("📁 Loading synthetic dataset...")
+    dataset = EventDataset.load("N-CARS")  # This will create synthetic data
+    train_loader, val_loader = dataset.get_loaders(
+        batch_size=16,
+        time_window=50e-3,
+        augmentation=True
+    )
     
-    # Simulate detections for visualization
-    fake_detections = [
-        {
-            'bbox': [20, 30, 40, 50],
-            'confidence': 0.85,
-            'class_name': 'object1'
-        },
-        {
-            'bbox': [60, 70, 30, 25],
-            'confidence': 0.72,
-            'class_name': 'object2'
-        }
-    ]
+    if train_loader is None:
+        print("⚠️  PyTorch not available, skipping training demo")
+        return
     
-    # Draw detections on image
-    vis_with_detections = visualizer.draw_detections(vis_image, fake_detections)
-    logger.info(f"Added {len(fake_detections)} detection overlays")
+    # 3. Setup training configuration
+    from spike_snn_event.training import SpikingTrainer, create_training_config
     
-    logger.info("Event visualization completed\n")
-
-
-def example_6_file_operations():
-    """Example 6: Loading and saving events."""
-    logger.info("=== Example 6: File Operations ===")
+    config = create_training_config(
+        learning_rate=1e-3,
+        epochs=5,  # Short demo
+        batch_size=16,
+        loss_function="cross_entropy"
+    )
     
-    # Generate sample events
-    events = np.random.rand(1000, 4)
-    events[:, 0] *= 128
-    events[:, 1] *= 128
-    events[:, 2] = np.sort(np.random.rand(1000) * 0.1)
-    events[:, 3] = np.random.choice([-1, 1], 1000)
-    
-    # Metadata
-    metadata = {
-        'sensor_type': 'DVS128',
-        'resolution': [128, 128],
-        'duration': 0.1,
-        'event_count': len(events)
-    }
-    
-    # Save events to different formats
-    output_dir = Path("example_output")
-    output_dir.mkdir(exist_ok=True)
-    
-    # Save as NumPy format
-    npy_path = output_dir / "events.npy"
-    snn.save_events_to_file(events, str(npy_path), metadata)
-    logger.info(f"Saved events to {npy_path}")
-    
-    # Save as text format
-    txt_path = output_dir / "events.txt"
-    snn.save_events_to_file(events, str(txt_path), metadata)
-    logger.info(f"Saved events to {txt_path}")
-    
-    # Load events back
-    loaded_events, loaded_metadata = snn.load_events_from_file(str(npy_path))
-    logger.info(f"Loaded {len(loaded_events)} events")
-    logger.info(f"Loaded metadata: {loaded_metadata}")
-    
-    # Verify data integrity
-    if np.allclose(events, loaded_events):
-        logger.info("✓ Data integrity check passed")
-    else:
-        logger.error("✗ Data integrity check failed")
-    
-    logger.info("File operations completed\n")
-
-
-def example_7_training_pipeline():
-    """Example 7: Basic training pipeline setup."""
-    logger.info("=== Example 7: Training Pipeline ===")
+    # 4. Train model
+    print("🏃 Starting training...")
+    device = torch.device("cpu")  # Use CPU for compatibility
+    trainer = SpikingTrainer(model, config, device)
     
     try:
-        # Create training configuration
-        config = snn.create_training_config(
-            learning_rate=1e-3,
-            epochs=10,
-            batch_size=16,
-            early_stopping_patience=5
+        history = trainer.fit(
+            train_loader,
+            val_loader,
+            save_dir="./demo_checkpoints"
         )
-        logger.info(f"Created training config: {config}")
         
-        # Create model for training
-        model = snn.CustomSNN(
+        print("✅ Training completed!")
+        print(f"Final train loss: {history['train_loss'][-1]:.4f}")
+        print(f"Final train accuracy: {history['train_accuracy'][-1]:.4f}")
+        
+    except Exception as e:
+        print(f"⚠️  Training demo failed: {e}")
+
+
+def event_preprocessing_demo():
+    """Demonstrate event preprocessing pipeline."""
+    print("\n🔧 Event Preprocessing Demo")
+    print("=" * 50)
+    
+    # 1. Create preprocessor
+    preprocessor = SpatioTemporalPreprocessor(
+        spatial_size=(256, 256),
+        time_bins=5
+    )
+    
+    # 2. Generate synthetic events
+    print("🎲 Generating synthetic events...")
+    num_events = 1000
+    events = np.zeros((num_events, 4))
+    events[:, 0] = np.random.uniform(0, 128, num_events)    # x
+    events[:, 1] = np.random.uniform(0, 128, num_events)    # y
+    events[:, 2] = np.cumsum(np.random.exponential(1e-3, num_events))  # timestamps
+    events[:, 3] = np.random.choice([-1, 1], num_events)   # polarity
+    
+    print(f"Generated {len(events)} events")
+    print(f"Time span: {events[:, 2].max() - events[:, 2].min():.3f}s")
+    
+    # 3. Process events
+    print("⚙️  Processing events...")
+    processed_events = preprocessor.process(events)
+    
+    print(f"Processed shape: {processed_events.shape}")
+    
+    # 4. Show preprocessing statistics
+    stats = preprocessor.get_statistics()
+    print("📊 Preprocessing Statistics:")
+    for key, value in stats.items():
+        print(f"   {key}: {value}")
+
+
+def file_io_demo():
+    """Demonstrate event file I/O operations."""
+    print("\n💾 Event File I/O Demo")
+    print("=" * 50)
+    
+    from spike_snn_event.core import save_events_to_file, load_events_from_file
+    
+    # 1. Generate sample events
+    print("🎲 Generating sample events...")
+    num_events = 500
+    events = np.zeros((num_events, 4))
+    events[:, 0] = np.random.uniform(0, 240, num_events)  # x
+    events[:, 1] = np.random.uniform(0, 180, num_events)  # y
+    events[:, 2] = np.cumsum(np.random.exponential(2e-3, num_events))  # timestamps
+    events[:, 3] = np.random.choice([-1, 1], num_events)  # polarity
+    
+    # 2. Save to different formats
+    print("💾 Saving events to different formats...")
+    metadata = {
+        "sensor_type": "DVS240",
+        "recording_duration": events[:, 2].max(),
+        "total_events": len(events)
+    }
+    
+    formats = [".npy", ".txt", ".dat"]
+    for fmt in formats:
+        filepath = f"demo_events{fmt}"
+        try:
+            save_events_to_file(events, filepath, metadata)
+            print(f"   ✅ Saved to {filepath}")
+        except Exception as e:
+            print(f"   ⚠️  Failed to save {filepath}: {e}")
+    
+    # 3. Load and verify
+    print("📂 Loading and verifying events...")
+    for fmt in formats:
+        filepath = f"demo_events{fmt}"
+        try:
+            loaded_events, loaded_metadata = load_events_from_file(filepath)
+            
+            if np.allclose(events, loaded_events, rtol=1e-5):
+                print(f"   ✅ {filepath}: Events match!")
+            else:
+                print(f"   ⚠️  {filepath}: Events don't match")
+                
+            if loaded_metadata:
+                print(f"   📊 Metadata keys: {list(loaded_metadata.keys())}")
+                
+        except Exception as e:
+            print(f"   ⚠️  Failed to load {filepath}: {e}")
+
+
+def performance_analysis_demo():
+    """Demonstrate model performance analysis."""
+    print("\n⚡ Performance Analysis Demo")
+    print("=" * 50)
+    
+    if not PYTORCH_MODELS_AVAILABLE:
+        print("⚠️  PyTorch models not available, skipping performance analysis demo")
+        return
+    
+    # 1. Create models for comparison
+    models = {
+        "Small SNN": CustomSNN(
             input_size=(64, 64),
             hidden_channels=[32, 64],
             output_classes=2
+        ),
+        "Medium SNN": CustomSNN(
+            input_size=(128, 128),
+            hidden_channels=[64, 128, 256],
+            output_classes=2
+        ),
+        "Large SNN": CustomSNN(
+            input_size=(256, 256),
+            hidden_channels=[128, 256, 512],
+            output_classes=2
         )
-        
-        # Initialize trainer
-        trainer = snn.SpikingTrainer(model, config)
-        logger.info("Initialized SNN trainer")
-        
-        # Create synthetic dataset
-        dataset = snn.EventDataset.load("synthetic")  # This creates synthetic data
-        if dataset:
-            train_loader, val_loader = dataset.get_loaders(batch_size=config.batch_size)
-            
-            if train_loader and val_loader:
-                logger.info(f"Created data loaders with batch size {config.batch_size}")
-                logger.info(f"Training batches: {len(train_loader)}")
-                logger.info(f"Validation batches: {len(val_loader)}")
-                
-                # Note: Actual training would be run here with trainer.fit()
-                # trainer.fit(train_loader, val_loader, save_dir="checkpoints")
-                logger.info("Training pipeline setup completed (training not run in example)")
-            else:
-                logger.warning("Could not create data loaders")
-        else:
-            logger.warning("Could not create dataset")
-        
-    except ImportError:
-        logger.warning("PyTorch not available, skipping training pipeline example")
+    }
     
-    logger.info("Training pipeline example completed\n")
+    # 2. Analyze each model
+    print("🔍 Analyzing model performance...")
+    
+    for name, model in models.items():
+        print(f"\n📊 {name}:")
+        
+        # Model statistics
+        stats = model.get_model_statistics()
+        print(f"   Parameters: {stats['total_parameters']:,}")
+        
+        # Create sample input
+        h, w = model.input_size
+        sample_input = torch.randn(1, 2, h, w, 10)
+        
+        # Profile inference
+        try:
+            profile_results = model.profile_inference(sample_input)
+            print(f"   Mean latency: {profile_results['mean_latency_ms']:.2f}ms")
+            print(f"   Throughput: {profile_results['throughput_fps']:.1f} FPS")
+        except Exception as e:
+            print(f"   ⚠️  Profiling failed: {e}")
 
 
 def main():
-    """Run all examples."""
-    logger.info("Starting Spike SNN Event Vision Kit Examples")
-    logger.info("=" * 50)
+    """Run all demo functions."""
+    print("🎯 Spike-SNN Event Vision Kit - Basic Usage Examples")
+    print("=" * 60)
     
-    examples = [
-        example_1_basic_camera_setup,
-        example_2_event_preprocessing,
-        example_3_snn_inference,
-        example_4_yolo_detection,
-        example_5_visualization,
-        example_6_file_operations,
-        example_7_training_pipeline
+    demos = [
+        ("Basic Event Detection", basic_event_detection_demo),
+        ("Custom SNN Training", custom_snn_training_demo),
+        ("Event Preprocessing", event_preprocessing_demo),
+        ("File I/O Operations", file_io_demo),
+        ("Performance Analysis", performance_analysis_demo),
     ]
     
-    for i, example_func in enumerate(examples, 1):
+    for demo_name, demo_func in demos:
         try:
-            example_func()
+            demo_func()
+            print(f"\n✅ {demo_name} completed successfully!\n")
         except Exception as e:
-            logger.error(f"Example {i} failed: {e}")
+            print(f"\n❌ {demo_name} failed: {e}")
             import traceback
             traceback.print_exc()
+            print()
         
-        # Small delay between examples
-        time.sleep(0.5)
+        # Pause between demos
+        time.sleep(1)
     
-    logger.info("All examples completed!")
-    logger.info("Check the 'example_output' directory for generated files.")
+    print("🎉 All demos completed!")
+    print("\nNext steps:")
+    print("- Try the CLI: python -m spike_snn_event.cli demo")
+    print("- Train a model: python -m spike_snn_event.cli train --epochs 20")
+    print("- Run detection: python -m spike_snn_event.cli detect --input demo")
 
 
 if __name__ == "__main__":

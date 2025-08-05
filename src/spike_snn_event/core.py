@@ -9,7 +9,11 @@ import numpy as np
 from typing import Iterator, Tuple, Optional, Dict, Any, List, Union
 import time
 from pathlib import Path
-import cv2
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
 import threading
 from queue import Queue
 import logging
@@ -279,6 +283,10 @@ class EventVisualizer:
     ) -> np.ndarray:
         """Draw detection bounding boxes on image."""
         vis_image = image.copy()
+        
+        if not CV2_AVAILABLE:
+            print("Warning: OpenCV not available, cannot draw detections")
+            return vis_image
         
         for detection in detections:
             bbox = detection.get('bbox', [0, 0, 10, 10])

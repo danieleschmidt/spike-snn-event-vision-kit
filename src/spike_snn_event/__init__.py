@@ -13,7 +13,7 @@ __author__ = "Daniel Schmidt"
 __email__ = "daniel@example.com"
 __license__ = "MIT"
 
-# Core imports for easy access
+# Core imports for easy access (always available)
 from .core import (
     DVSCamera, 
     EventPreprocessor, 
@@ -25,21 +25,27 @@ from .core import (
     load_events_from_file,
     save_events_to_file
 )
-from .models import (
-    EventSNN, 
-    SpikingYOLO, 
-    CustomSNN, 
-    LIFNeuron,
-    SpikingConv2d,
-    TrainingConfig,
-    SurrogateGradient,
-    SpikingLayer
-)
-from .training import (
-    SpikingTrainer,
-    EventDataLoader,
-    create_training_config
-)
+
+# Model imports (require PyTorch)
+try:
+    from .models import (
+        EventSNN, 
+        SpikingYOLO, 
+        CustomSNN, 
+        LIFNeuron,
+        SpikingConv2d,
+        TrainingConfig,
+        SurrogateGradient,
+        SpikingLayer
+    )
+    from .training import (
+        SpikingTrainer,
+        EventDataLoader,
+        create_training_config
+    )
+    PYTORCH_MODELS_AVAILABLE = True
+except ImportError:
+    PYTORCH_MODELS_AVAILABLE = False
 
 # Optional ROS2 imports
 try:
@@ -53,7 +59,7 @@ except ImportError:
     ROS2_AVAILABLE = False
 
 __all__ = [
-    # Core functionality
+    # Core functionality (always available)
     "DVSCamera",
     "EventPreprocessor", 
     "SpatioTemporalPreprocessor",
@@ -63,22 +69,26 @@ __all__ = [
     "HotPixelFilter",
     "load_events_from_file",
     "save_events_to_file",
-    
-    # Models
-    "EventSNN",
-    "SpikingYOLO",
-    "CustomSNN",
-    "LIFNeuron",
-    "SpikingConv2d",
-    "TrainingConfig",
-    "SurrogateGradient",
-    "SpikingLayer",
-    
-    # Training
-    "SpikingTrainer",
-    "EventDataLoader",
-    "create_training_config",
 ]
+
+# Add PyTorch-dependent classes if available
+if PYTORCH_MODELS_AVAILABLE:
+    __all__.extend([
+        # Models
+        "EventSNN",
+        "SpikingYOLO",
+        "CustomSNN",
+        "LIFNeuron",
+        "SpikingConv2d",
+        "TrainingConfig",
+        "SurrogateGradient",
+        "SpikingLayer",
+        
+        # Training
+        "SpikingTrainer",
+        "EventDataLoader",
+        "create_training_config",
+    ])
 
 # Add ROS2 classes if available
 if ROS2_AVAILABLE:
