@@ -194,4 +194,331 @@ class HealthChecker:
         recommendations = []
         
         # Check CPU usage
-        cpu_status = self._check_threshold(\n            current_metrics.cpu_usage_percent,\n            self.thresholds['cpu_usage_warning'],\n            self.thresholds['cpu_usage_critical']\n        )\n        component_statuses['cpu'] = cpu_status\n        if cpu_status == 'critical':\n            alerts.append(f\"Critical CPU usage: {current_metrics.cpu_usage_percent:.1f}%\")\n            recommendations.append(\"Consider reducing batch size or using GPU acceleration\")\n        elif cpu_status == 'warning':\n            alerts.append(f\"High CPU usage: {current_metrics.cpu_usage_percent:.1f}%\")\n            \n        # Check memory usage\n        memory_status = self._check_threshold(\n            current_metrics.memory_usage_mb,\n            self.thresholds['memory_usage_warning'],\n            self.thresholds['memory_usage_critical']\n        )\n        component_statuses['memory'] = memory_status\n        if memory_status == 'critical':\n            alerts.append(f\"Critical memory usage: {current_metrics.memory_usage_mb:.1f}MB\")\n            recommendations.append(\"Restart system or reduce processing load\")\n        elif memory_status == 'warning':\n            alerts.append(f\"High memory usage: {current_metrics.memory_usage_mb:.1f}MB\")\n            \n        # Check inference latency\n        latency_status = self._check_threshold(\n            current_metrics.inference_latency_ms,\n            self.thresholds['latency_warning'],\n            self.thresholds['latency_critical']\n        )\n        component_statuses['latency'] = latency_status\n        if latency_status == 'critical':\n            alerts.append(f\"Critical inference latency: {current_metrics.inference_latency_ms:.1f}ms\")\n            recommendations.append(\"Check GPU availability or reduce model complexity\")\n        elif latency_status == 'warning':\n            alerts.append(f\"High inference latency: {current_metrics.inference_latency_ms:.1f}ms\")\n            \n        # Check error rate\n        error_status = self._check_threshold(\n            current_metrics.error_rate,\n            self.thresholds['error_rate_warning'],\n            self.thresholds['error_rate_critical']\n        )\n        component_statuses['errors'] = error_status\n        if error_status == 'critical':\n            alerts.append(f\"Critical error rate: {current_metrics.error_rate:.1%}\")\n            recommendations.append(\"Check logs for recurring errors and restart if necessary\")\n        elif error_status == 'warning':\n            alerts.append(f\"High error rate: {current_metrics.error_rate:.1%}\")\n            \n        # Check accuracy (if available)\n        if current_metrics.detection_accuracy > 0:\n            accuracy_status = self._check_threshold(\n                current_metrics.detection_accuracy,\n                self.thresholds['accuracy_critical'],\n                self.thresholds['accuracy_warning'],\n                reverse=True  # Lower values are worse\n            )\n            component_statuses['accuracy'] = accuracy_status\n            if accuracy_status == 'critical':\n                alerts.append(f\"Low detection accuracy: {current_metrics.detection_accuracy:.1%}\")\n                recommendations.append(\"Check model weights or retrain model\")\n            elif accuracy_status == 'warning':\n                alerts.append(f\"Reduced detection accuracy: {current_metrics.detection_accuracy:.1%}\")\n        else:\n            component_statuses['accuracy'] = 'unknown'\n            \n        # Determine overall status\n        overall_status = self._determine_overall_status(component_statuses)\n        \n        return HealthStatus(\n            timestamp=time.time(),\n            overall_status=overall_status,\n            component_statuses=component_statuses,\n            alerts=alerts,\n            recommendations=recommendations\n        )\n        \n    def _check_threshold(\n        self, \n        value: float, \n        warning_threshold: float, \n        critical_threshold: float,\n        reverse: bool = False\n    ) -> str:\n        \"\"\"Check value against thresholds.\"\"\"\n        if reverse:\n            if value < critical_threshold:\n                return 'critical'\n            elif value < warning_threshold:\n                return 'warning'\n        else:\n            if value > critical_threshold:\n                return 'critical'\n            elif value > warning_threshold:\n                return 'warning'\n        return 'healthy'\n        \n    def _determine_overall_status(self, component_statuses: Dict[str, str]) -> str:\n        \"\"\"Determine overall system status.\"\"\"\n        if any(status == 'critical' for status in component_statuses.values()):\n            return 'critical'\n        elif any(status == 'warning' for status in component_statuses.values()):\n            return 'warning'\n        else:\n            return 'healthy'\n\n\nclass Logger:\n    \"\"\"Enhanced logging with structured output and monitoring integration.\"\"\"\n    \n    def __init__(self, name: str, level: str = \"INFO\", log_file: Optional[str] = None):\n        self.logger = logging.getLogger(name)\n        self.logger.setLevel(getattr(logging, level.upper()))\n        \n        # Create formatter\n        formatter = logging.Formatter(\n            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'\n        )\n        \n        # Console handler\n        console_handler = logging.StreamHandler()\n        console_handler.setFormatter(formatter)\n        self.logger.addHandler(console_handler)\n        \n        # File handler if specified\n        if log_file:\n            file_handler = logging.FileHandler(log_file)\n            file_handler.setFormatter(formatter)\n            self.logger.addHandler(file_handler)\n            \n        # Metrics integration\n        self.metrics_collector = None\n        \n    def set_metrics_collector(self, metrics_collector: MetricsCollector):\n        \"\"\"Associate with metrics collector for error tracking.\"\"\"\n        self.metrics_collector = metrics_collector\n        \n    def info(self, message: str, **kwargs):\n        \"\"\"Log info message.\"\"\"\n        self.logger.info(self._format_message(message, **kwargs))\n        \n    def warning(self, message: str, **kwargs):\n        \"\"\"Log warning message.\"\"\"\n        self.logger.warning(self._format_message(message, **kwargs))\n        \n    def error(self, message: str, **kwargs):\n        \"\"\"Log error message and update metrics.\"\"\"\n        self.logger.error(self._format_message(message, **kwargs))\n        if self.metrics_collector:\n            self.metrics_collector.record_error(kwargs.get('error_type', 'general'))\n            \n    def critical(self, message: str, **kwargs):\n        \"\"\"Log critical message and update metrics.\"\"\"\n        self.logger.critical(self._format_message(message, **kwargs))\n        if self.metrics_collector:\n            self.metrics_collector.record_error(kwargs.get('error_type', 'critical'))\n            \n    def debug(self, message: str, **kwargs):\n        \"\"\"Log debug message.\"\"\"\n        self.logger.debug(self._format_message(message, **kwargs))\n        \n    def _format_message(self, message: str, **kwargs) -> str:\n        \"\"\"Format message with additional context.\"\"\"\n        if kwargs:\n            context = ' | '.join(f\"{k}={v}\" for k, v in kwargs.items())\n            return f\"{message} | {context}\"\n        return message\n\n\nclass MonitoringDashboard:\n    \"\"\"Simple monitoring dashboard for system status.\"\"\"\n    \n    def __init__(\n        self, \n        metrics_collector: MetricsCollector,\n        health_checker: HealthChecker,\n        update_interval: float = 30.0\n    ):\n        self.metrics_collector = metrics_collector\n        self.health_checker = health_checker\n        self.update_interval = update_interval\n        self.running = False\n        self._thread = None\n        \n    def start(self):\n        \"\"\"Start monitoring dashboard.\"\"\"\n        if not self.running:\n            self.running = True\n            self._thread = threading.Thread(target=self._monitor_loop, daemon=True)\n            self._thread.start()\n            \n    def stop(self):\n        \"\"\"Stop monitoring dashboard.\"\"\"\n        self.running = False\n        if self._thread:\n            self._thread.join(timeout=5.0)\n            \n    def _monitor_loop(self):\n        \"\"\"Main monitoring loop.\"\"\"\n        while self.running:\n            try:\n                health_status = self.health_checker.check_health()\n                metrics_summary = self.metrics_collector.get_metrics_summary(60)\n                \n                self._print_status(health_status, metrics_summary)\n                \n            except Exception as e:\n                logging.error(f\"Monitoring dashboard error: {e}\")\n                \n            time.sleep(self.update_interval)\n            \n    def _print_status(self, health_status: HealthStatus, metrics_summary: Dict[str, Any]):\n        \"\"\"Print current system status.\"\"\"\n        print(\"\\n\" + \"=\"*60)\n        print(f\"SYSTEM STATUS - {datetime.fromtimestamp(health_status.timestamp).strftime('%Y-%m-%d %H:%M:%S')}\")\n        print(\"=\"*60)\n        \n        # Overall status\n        status_symbol = {\n            'healthy': '✓',\n            'warning': '⚠',\n            'critical': '✗'\n        }.get(health_status.overall_status, '?')\n        \n        print(f\"Overall Status: {status_symbol} {health_status.overall_status.upper()}\")\n        \n        # Component status\n        print(\"\\nComponent Status:\")\n        for component, status in health_status.component_statuses.items():\n            symbol = {'healthy': '✓', 'warning': '⚠', 'critical': '✗', 'unknown': '?'}.get(status, '?')\n            print(f\"  {component.capitalize():12} {symbol} {status}\")\n            \n        # Key metrics\n        if 'error' not in metrics_summary:\n            print(\"\\nKey Metrics (last 60 min):\")\n            print(f\"  Events/sec:     {metrics_summary.get('avg_events_per_sec', 0):.1f}\")\n            print(f\"  Avg Latency:    {metrics_summary.get('avg_latency_ms', 0):.1f}ms\")\n            print(f\"  CPU Usage:      {metrics_summary.get('avg_cpu_usage', 0):.1f}%\")\n            print(f\"  Memory Usage:   {metrics_summary.get('avg_memory_mb', 0):.1f}MB\")\n            print(f\"  Error Rate:     {metrics_summary.get('avg_error_rate', 0):.1%}\")\n            if metrics_summary.get('avg_accuracy', 0) > 0:\n                print(f\"  Accuracy:       {metrics_summary.get('avg_accuracy', 0):.1%}\")\n                \n        # Alerts\n        if health_status.alerts:\n            print(\"\\nAlerts:\")\n            for alert in health_status.alerts:\n                print(f\"  ⚠ {alert}\")\n                \n        # Recommendations\n        if health_status.recommendations:\n            print(\"\\nRecommendations:\")\n            for rec in health_status.recommendations:\n                print(f\"  💡 {rec}\")\n                \n        print(\"=\"*60)\n        \n    def export_metrics(self, filepath: str):\n        \"\"\"Export current metrics to file.\"\"\"\n        health_status = self.health_checker.check_health()\n        metrics_summary = self.metrics_collector.get_metrics_summary()\n        current_metrics = self.metrics_collector.get_current_metrics()\n        \n        export_data = {\n            'timestamp': time.time(),\n            'health_status': asdict(health_status),\n            'metrics_summary': metrics_summary,\n            'current_metrics': asdict(current_metrics)\n        }\n        \n        with open(filepath, 'w') as f:\n            json.dump(export_data, f, indent=2, default=str)\n\n\n# Global monitoring instances\n_global_metrics_collector = None\n_global_health_checker = None\n_global_dashboard = None\n\n\ndef get_metrics_collector() -> MetricsCollector:\n    \"\"\"Get global metrics collector instance.\"\"\"\n    global _global_metrics_collector\n    if _global_metrics_collector is None:\n        _global_metrics_collector = MetricsCollector()\n    return _global_metrics_collector\n\n\ndef get_health_checker() -> HealthChecker:\n    \"\"\"Get global health checker instance.\"\"\"\n    global _global_health_checker\n    if _global_health_checker is None:\n        _global_health_checker = HealthChecker(get_metrics_collector())\n    return _global_health_checker\n\n\ndef get_dashboard() -> MonitoringDashboard:\n    \"\"\"Get global monitoring dashboard instance.\"\"\"\n    global _global_dashboard\n    if _global_dashboard is None:\n        _global_dashboard = MonitoringDashboard(\n            get_metrics_collector(),\n            get_health_checker()\n        )\n    return _global_dashboard\n\n\ndef start_monitoring():\n    \"\"\"Start global monitoring.\"\"\"\n    dashboard = get_dashboard()\n    dashboard.start()\n    logging.info(\"Monitoring dashboard started\")\n\n\ndef stop_monitoring():\n    \"\"\"Stop global monitoring.\"\"\"\n    dashboard = get_dashboard()\n    dashboard.stop()\n    logging.info(\"Monitoring dashboard stopped\")\n\n\ndef export_system_report(filepath: str = \"system_report.json\"):\n    \"\"\"Export comprehensive system report.\"\"\"\n    dashboard = get_dashboard()\n    dashboard.export_metrics(filepath)\n    logging.info(f\"System report exported to {filepath}\")
+        cpu_status = self._check_threshold(
+            current_metrics.cpu_usage_percent,
+            self.thresholds['cpu_usage_warning'],
+            self.thresholds['cpu_usage_critical']
+        )
+        component_statuses['cpu'] = cpu_status
+        if cpu_status == 'critical':
+            alerts.append(f"Critical CPU usage: {current_metrics.cpu_usage_percent:.1f}%")
+            recommendations.append("Consider reducing batch size or using GPU acceleration")
+        elif cpu_status == 'warning':
+            alerts.append(f"High CPU usage: {current_metrics.cpu_usage_percent:.1f}%")
+            
+        # Check memory usage
+        memory_status = self._check_threshold(
+            current_metrics.memory_usage_mb,
+            self.thresholds['memory_usage_warning'],
+            self.thresholds['memory_usage_critical']
+        )
+        component_statuses['memory'] = memory_status
+        if memory_status == 'critical':
+            alerts.append(f"Critical memory usage: {current_metrics.memory_usage_mb:.1f}MB")
+            recommendations.append("Restart system or reduce processing load")
+        elif memory_status == 'warning':
+            alerts.append(f"High memory usage: {current_metrics.memory_usage_mb:.1f}MB")
+            
+        # Check inference latency
+        latency_status = self._check_threshold(
+            current_metrics.inference_latency_ms,
+            self.thresholds['latency_warning'],
+            self.thresholds['latency_critical']
+        )
+        component_statuses['latency'] = latency_status
+        if latency_status == 'critical':
+            alerts.append(f"Critical inference latency: {current_metrics.inference_latency_ms:.1f}ms")
+            recommendations.append("Check GPU availability or reduce model complexity")
+        elif latency_status == 'warning':
+            alerts.append(f"High inference latency: {current_metrics.inference_latency_ms:.1f}ms")
+            
+        # Check error rate
+        error_status = self._check_threshold(
+            current_metrics.error_rate,
+            self.thresholds['error_rate_warning'],
+            self.thresholds['error_rate_critical']
+        )
+        component_statuses['errors'] = error_status
+        if error_status == 'critical':
+            alerts.append(f"Critical error rate: {current_metrics.error_rate:.1%}")
+            recommendations.append("Check logs for recurring errors and restart if necessary")
+        elif error_status == 'warning':
+            alerts.append(f"High error rate: {current_metrics.error_rate:.1%}")
+            
+        # Check accuracy (if available)
+        if current_metrics.detection_accuracy > 0:
+            accuracy_status = self._check_threshold(
+                current_metrics.detection_accuracy,
+                self.thresholds['accuracy_critical'],
+                self.thresholds['accuracy_warning'],
+                reverse=True  # Lower values are worse
+            )
+            component_statuses['accuracy'] = accuracy_status
+            if accuracy_status == 'critical':
+                alerts.append(f"Low detection accuracy: {current_metrics.detection_accuracy:.1%}")
+                recommendations.append("Check model weights or retrain model")
+            elif accuracy_status == 'warning':
+                alerts.append(f"Reduced detection accuracy: {current_metrics.detection_accuracy:.1%}")
+        else:
+            component_statuses['accuracy'] = 'unknown'
+            
+        # Determine overall status
+        overall_status = self._determine_overall_status(component_statuses)
+        
+        return HealthStatus(
+            timestamp=time.time(),
+            overall_status=overall_status,
+            component_statuses=component_statuses,
+            alerts=alerts,
+            recommendations=recommendations
+        )
+        
+    def _check_threshold(
+        self, 
+        value: float, 
+        warning_threshold: float, 
+        critical_threshold: float,
+        reverse: bool = False
+    ) -> str:
+        """Check value against thresholds."""
+        if reverse:
+            if value < critical_threshold:
+                return 'critical'
+            elif value < warning_threshold:
+                return 'warning'
+        else:
+            if value > critical_threshold:
+                return 'critical'
+            elif value > warning_threshold:
+                return 'warning'
+        return 'healthy'
+        
+    def _determine_overall_status(self, component_statuses: Dict[str, str]) -> str:
+        """Determine overall system status."""
+        if any(status == 'critical' for status in component_statuses.values()):
+            return 'critical'
+        elif any(status == 'warning' for status in component_statuses.values()):
+            return 'warning'
+        else:
+            return 'healthy'
+
+
+class Logger:
+    """Enhanced logging with structured output and monitoring integration."""
+    
+    def __init__(self, name: str, level: str = "INFO", log_file: Optional[str] = None):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(getattr(logging, level.upper()))
+        
+        # Create formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+        
+        # File handler if specified
+        if log_file:
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+            
+        # Metrics integration
+        self.metrics_collector = None
+        
+    def set_metrics_collector(self, metrics_collector: MetricsCollector):
+        """Associate with metrics collector for error tracking."""
+        self.metrics_collector = metrics_collector
+        
+    def info(self, message: str, **kwargs):
+        """Log info message."""
+        self.logger.info(self._format_message(message, **kwargs))
+        
+    def warning(self, message: str, **kwargs):
+        """Log warning message."""
+        self.logger.warning(self._format_message(message, **kwargs))
+        
+    def error(self, message: str, **kwargs):
+        """Log error message and update metrics."""
+        self.logger.error(self._format_message(message, **kwargs))
+        if self.metrics_collector:
+            self.metrics_collector.record_error(kwargs.get('error_type', 'general'))
+            
+    def critical(self, message: str, **kwargs):
+        """Log critical message and update metrics."""
+        self.logger.critical(self._format_message(message, **kwargs))
+        if self.metrics_collector:
+            self.metrics_collector.record_error(kwargs.get('error_type', 'critical'))
+            
+    def debug(self, message: str, **kwargs):
+        """Log debug message."""
+        self.logger.debug(self._format_message(message, **kwargs))
+        
+    def _format_message(self, message: str, **kwargs) -> str:
+        """Format message with additional context."""
+        if kwargs:
+            context = ' | '.join(f"{k}={v}" for k, v in kwargs.items())
+            return f"{message} | {context}"
+        return message
+
+
+class MonitoringDashboard:
+    """Simple monitoring dashboard for system status."""
+    
+    def __init__(
+        self, 
+        metrics_collector: MetricsCollector,
+        health_checker: HealthChecker,
+        update_interval: float = 30.0
+    ):
+        self.metrics_collector = metrics_collector
+        self.health_checker = health_checker
+        self.update_interval = update_interval
+        self.running = False
+        self._thread = None
+        
+    def start(self):
+        """Start monitoring dashboard."""
+        if not self.running:
+            self.running = True
+            self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
+            self._thread.start()
+            
+    def stop(self):
+        """Stop monitoring dashboard."""
+        self.running = False
+        if self._thread:
+            self._thread.join(timeout=5.0)
+            
+    def _monitor_loop(self):
+        """Main monitoring loop."""
+        while self.running:
+            try:
+                health_status = self.health_checker.check_health()
+                metrics_summary = self.metrics_collector.get_metrics_summary(60)
+                
+                self._print_status(health_status, metrics_summary)
+                
+            except Exception as e:
+                logging.error(f"Monitoring dashboard error: {e}")
+                
+            time.sleep(self.update_interval)
+            
+    def _print_status(self, health_status: HealthStatus, metrics_summary: Dict[str, Any]):
+        """Print current system status."""
+        print("\n" + "="*60)
+        print(f"SYSTEM STATUS - {datetime.fromtimestamp(health_status.timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
+        print("="*60)
+        
+        # Overall status
+        status_symbol = {
+            'healthy': '✓',
+            'warning': '⚠',
+            'critical': '✗'
+        }.get(health_status.overall_status, '?')
+        
+        print(f"Overall Status: {status_symbol} {health_status.overall_status.upper()}")
+        
+        # Component status
+        print("\nComponent Status:")
+        for component, status in health_status.component_statuses.items():
+            symbol = {'healthy': '✓', 'warning': '⚠', 'critical': '✗', 'unknown': '?'}.get(status, '?')
+            print(f"  {component.capitalize():12} {symbol} {status}")
+            
+        # Key metrics
+        if 'error' not in metrics_summary:
+            print("\nKey Metrics (last 60 min):")
+            print(f"  Events/sec:     {metrics_summary.get('avg_events_per_sec', 0):.1f}")
+            print(f"  Avg Latency:    {metrics_summary.get('avg_latency_ms', 0):.1f}ms")
+            print(f"  CPU Usage:      {metrics_summary.get('avg_cpu_usage', 0):.1f}%")
+            print(f"  Memory Usage:   {metrics_summary.get('avg_memory_mb', 0):.1f}MB")
+            print(f"  Error Rate:     {metrics_summary.get('avg_error_rate', 0):.1%}")
+            if metrics_summary.get('avg_accuracy', 0) > 0:
+                print(f"  Accuracy:       {metrics_summary.get('avg_accuracy', 0):.1%}")
+                
+        # Alerts
+        if health_status.alerts:
+            print("\nAlerts:")
+            for alert in health_status.alerts:
+                print(f"  ⚠ {alert}")
+                
+        # Recommendations
+        if health_status.recommendations:
+            print("\nRecommendations:")
+            for rec in health_status.recommendations:
+                print(f"  💡 {rec}")
+                
+        print("="*60)
+        
+    def export_metrics(self, filepath: str):
+        """Export current metrics to file."""
+        health_status = self.health_checker.check_health()
+        metrics_summary = self.metrics_collector.get_metrics_summary()
+        current_metrics = self.metrics_collector.get_current_metrics()
+        
+        export_data = {
+            'timestamp': time.time(),
+            'health_status': asdict(health_status),
+            'metrics_summary': metrics_summary,
+            'current_metrics': asdict(current_metrics)
+        }
+        
+        with open(filepath, 'w') as f:
+            json.dump(export_data, f, indent=2, default=str)
+
+
+# Global monitoring instances
+_global_metrics_collector = None
+_global_health_checker = None
+_global_dashboard = None
+
+
+def get_metrics_collector() -> MetricsCollector:
+    """Get global metrics collector instance."""
+    global _global_metrics_collector
+    if _global_metrics_collector is None:
+        _global_metrics_collector = MetricsCollector()
+    return _global_metrics_collector
+
+
+def get_health_checker() -> HealthChecker:
+    """Get global health checker instance."""
+    global _global_health_checker
+    if _global_health_checker is None:
+        _global_health_checker = HealthChecker(get_metrics_collector())
+    return _global_health_checker
+
+
+def get_dashboard() -> MonitoringDashboard:
+    """Get global monitoring dashboard instance."""
+    global _global_dashboard
+    if _global_dashboard is None:
+        _global_dashboard = MonitoringDashboard(
+            get_metrics_collector(),
+            get_health_checker()
+        )
+    return _global_dashboard
+
+
+def start_monitoring():
+    """Start global monitoring."""
+    dashboard = get_dashboard()
+    dashboard.start()
+    logging.info("Monitoring dashboard started")
+
+
+def stop_monitoring():
+    """Stop global monitoring."""
+    dashboard = get_dashboard()
+    dashboard.stop()
+    logging.info("Monitoring dashboard stopped")
+
+
+def export_system_report(filepath: str = "system_report.json"):
+    """Export comprehensive system report."""
+    dashboard = get_dashboard()
+    dashboard.export_metrics(filepath)
+    logging.info(f"System report exported to {filepath}")

@@ -207,6 +207,34 @@ class EventValidator:
             )
             
         return result
+        
+    def validate_image_dimensions(self, width: int, height: int) -> ValidationResult:
+        """Validate image dimensions."""
+        result = ValidationResult()
+        
+        if not isinstance(width, int) or not isinstance(height, int):
+            result.add_error(
+                "DIMENSION_TYPE_ERROR",
+                f"Width and height must be integers, got {type(width).__name__}, {type(height).__name__}",
+                "dimensions"
+            )
+            return result
+            
+        if width <= 0 or height <= 0:
+            result.add_error(
+                "DIMENSION_VALUE_ERROR", 
+                f"Width and height must be positive, got {width}x{height}",
+                "dimensions"
+            )
+            
+        if width > 10000 or height > 10000:
+            result.add_warning(
+                "DIMENSION_LARGE_WARNING",
+                f"Very large dimensions: {width}x{height}",
+                "dimensions"
+            )
+            
+        return result
 
 
 def get_event_validator():
@@ -230,3 +258,30 @@ def validate_and_handle(data, validator_func, operation: str, strict: bool = Tru
         if strict:
             raise
         return False
+
+
+# Convenient standalone validation functions for easy import
+def validate_events(events) -> ValidationResult:
+    """Validate event array - standalone function."""
+    validator = EventValidator()
+    return validator.validate_events(events)
+
+
+def validate_image_dimensions(width: int, height: int) -> ValidationResult:
+    """Validate image dimensions - standalone function."""
+    validator = EventValidator()
+    return validator.validate_image_dimensions(width, height)
+
+
+def safe_operation(operation_func, *args, **kwargs):
+    """Execute operation with error handling."""
+    try:
+        return operation_func(*args, **kwargs)
+    except Exception as e:
+        logging.error(f"Operation failed: {e}")
+        return None
+
+
+class ValidationError(Exception):
+    """Custom validation error exception."""
+    pass
