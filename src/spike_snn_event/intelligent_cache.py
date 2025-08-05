@@ -752,3 +752,31 @@ def intelligent_cache(
         
         return wrapper
     return decorator
+
+
+# Convenient wrapper classes for easy usage
+class IntelligentCache:
+    """Simplified wrapper for IntelligentLRUCache."""
+    
+    def __init__(self, max_size: int = 1000):
+        self._cache = IntelligentLRUCache(max_size_mb=max_size)
+        
+    def set(self, key: str, value: Any, ttl: Optional[float] = None):
+        """Set cache value."""
+        return self._cache.put(key, value, ttl=ttl)
+        
+    def get(self, key: str) -> Any:
+        """Get cache value."""
+        return self._cache.get(key)
+        
+    def delete(self, key: str):
+        """Delete cache entry."""
+        return self._cache.invalidate(key)
+        
+    def clear(self):
+        """Clear all cache entries."""
+        return self._cache.clear()
+        
+    def stats(self):
+        """Get cache statistics."""
+        return self._cache.get_statistics()

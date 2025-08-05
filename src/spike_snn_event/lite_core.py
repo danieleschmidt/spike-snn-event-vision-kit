@@ -8,6 +8,7 @@ for demonstration and testing purposes.
 import time
 import random
 import threading
+import numpy as np
 from queue import Queue
 from typing import Iterator, Tuple, Optional, Dict, Any, List
 from dataclasses import dataclass
@@ -59,6 +60,14 @@ class DVSCamera:
             'events_filtered': 0,
             'frames_generated': 0
         }
+        
+    def start_streaming(self):
+        """Start event streaming."""
+        self.is_streaming = True
+        
+    def stop_streaming(self):
+        """Stop event streaming."""
+        self.is_streaming = False
         
     def stream(self, duration: Optional[float] = None) -> Iterator[List[List[float]]]:
         """Stream events from camera (simulated).
@@ -174,8 +183,10 @@ class EventPreprocessor:
     """Base class for event stream preprocessing."""
     
     def process(self, events: List[List[float]]) -> List[List[float]]:
-        """Process event array."""
-        raise NotImplementedError
+        """Process event array - basic passthrough implementation."""
+        if isinstance(events, np.ndarray):
+            return events.tolist() if events.ndim > 1 else events
+        return events
 
 
 class SpatioTemporalPreprocessor(EventPreprocessor):

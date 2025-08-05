@@ -1,0 +1,39 @@
+{
+  "system": {
+    "environment": "production",
+    "log_level": "INFO",
+    "debug": false
+  },
+  "camera": {
+    "default_sensor": "DVS128",
+    "noise_filter": true,
+    "refractory_period": 0.001,
+    "hot_pixel_threshold": 1000
+  },
+  "snn": {
+    "input_size": [
+      128,
+      128
+    ],
+    "num_classes": 10,
+    "threshold": 0.5,
+    "batch_size": 32
+  },
+  "monitoring": {
+    "enabled": true,
+    "metrics_port": 9090,
+    "health_check_interval": 30,
+    "log_file": "/app/logs/spike-snn.log"
+  },
+  "performance": {
+    "max_cache_size": 1000,
+    "worker_threads": 4,
+    "max_memory_mb": 1024,
+    "timeout_seconds": 30
+  },
+  "security": {
+    "input_validation": true,
+    "rate_limiting": true,
+    "max_request_size": "10MB"
+  }
+}

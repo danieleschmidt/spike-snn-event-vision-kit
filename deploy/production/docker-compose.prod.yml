@@ -1,0 +1,39 @@
+services:
+  grafana:
+    environment:
+    - GF_SECURITY_ADMIN_PASSWORD=admin
+    image: grafana/grafana:latest
+    ports:
+    - 3000:3000
+    volumes:
+    - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+  monitoring:
+    image: prom/prometheus:latest
+    ports:
+    - 9090:9090
+    volumes:
+    - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  spike-snn-event-vision:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+    - ENV=production
+    - LOG_LEVEL=INFO
+    healthcheck:
+      interval: 30s
+      retries: 3
+      start_period: 40s
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8080/health
+      timeout: 10s
+    ports:
+    - 8080:8080
+    restart: unless-stopped
+    volumes:
+    - ./data:/app/data:ro
+    - ./logs:/app/logs
+version: '3.8'

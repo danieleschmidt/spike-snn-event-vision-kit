@@ -224,10 +224,10 @@ def benchmark_data():
     }
 
 
-# Performance benchmarks
-def pytest_benchmark_group_stats(config, benchmarks, group_by):
-    """Custom benchmark grouping."""
-    return group_by
+# Performance benchmarks (requires pytest-benchmark plugin)
+# def pytest_benchmark_group_stats(config, benchmarks, group_by):
+#     """Custom benchmark grouping."""
+#     return group_by
 
 
 # Cleanup fixtures

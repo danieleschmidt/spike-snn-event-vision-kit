@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: spike-snn-event-vision
+    component: neuromorphic-vision
+    version: v1.0.0
+  name: spike-snn-event-vision
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spike-snn-event-vision
+  template:
+    metadata:
+      labels:
+        app: spike-snn-event-vision
+    spec:
+      containers:
+      - env:
+        - name: ENV
+          value: production
+        - name: LOG_LEVEL
+          value: INFO
+        image: spike-snn-event-vision:v1.0.0
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: spike-snn-event-vision
+        ports:
+        - containerPort: 8080
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
