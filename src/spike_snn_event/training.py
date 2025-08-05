@@ -19,6 +19,9 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from .models import EventSNN, TrainingConfig
+from .monitoring import get_metrics_collector
+from .validation import validate_model_input, safe_operation, ValidationError
+from .security import get_input_sanitizer
 
 
 class SpikingTrainer:
@@ -49,8 +52,15 @@ class SpikingTrainer:
         self.patience_counter = 0
         self.training_history = []
         
-        # Logging
+        # Logging and monitoring
         self.logger = logging.getLogger(__name__)
+        self.metrics_collector = get_metrics_collector()
+        self.input_sanitizer = get_input_sanitizer()
+        
+        # Enhanced error tracking
+        self.error_count = 0
+        self.consecutive_errors = 0
+        self.max_consecutive_errors = 5
         
     def _create_optimizer(self) -> optim.Optimizer:
         """Create optimizer based on config."""
@@ -99,62 +109,101 @@ class SpikingTrainer:
         else:
             return None
             
+    @safe_operation
     def train_epoch(
         self, 
         train_loader: DataLoader,
         epoch: int
     ) -> Dict[str, float]:
-        """Train for one epoch."""
+        """Train for one epoch with enhanced error handling."""
         self.model.train()
         
         total_loss = 0.0
         total_correct = 0
         total_samples = 0
+        epoch_start_time = time.time()
         
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
         
         for batch_idx, (data, targets) in enumerate(pbar):
-            data, targets = data.to(self.device), targets.to(self.device)
-            
-            # Reset optimizer
-            self.optimizer.zero_grad()
-            
-            # Forward pass
-            outputs = self.model(data)
-            
-            # Compute loss
-            loss = self.model.compute_loss(outputs, targets, self.config.loss_function)
-            
-            # Backward pass
-            loss.backward()
-            
-            # Gradient clipping
-            if self.config.gradient_clip_value > 0:
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    self.config.gradient_clip_value
-                )
+            try:
+                # Validate inputs
+                data = validate_model_input(data)
+                data, targets = data.to(self.device), targets.to(self.device)
                 
-            # Optimizer step
-            self.optimizer.step()
-            
-            # Statistics
-            total_loss += loss.item()
-            if targets.dim() == 1:  # Classification
-                predicted = outputs.argmax(dim=1)
-                total_correct += (predicted == targets).sum().item()
-            total_samples += targets.size(0)
-            
-            # Update progress bar
-            current_acc = total_correct / total_samples if total_samples > 0 else 0.0
-            pbar.set_postfix({
-                'loss': f"{total_loss / (batch_idx + 1):.4f}",
-                'acc': f"{current_acc:.4f}"
-            })
-            
+                # Reset optimizer
+                self.optimizer.zero_grad()
+                
+                # Forward pass
+                outputs = self.model(data)
+                
+                # Compute loss
+                loss = self.model.compute_loss(outputs, targets, self.config.loss_function)
+                
+                # Check for invalid loss
+                if not torch.isfinite(loss):
+                    self.logger.warning(f"Invalid loss detected at batch {batch_idx}, skipping")
+                    self.consecutive_errors += 1
+                    if self.consecutive_errors >= self.max_consecutive_errors:
+                        raise RuntimeError("Too many consecutive training errors")
+                    continue
+                
+                # Backward pass
+                loss.backward()
+                
+                # Gradient clipping
+                if self.config.gradient_clip_value > 0:
+                    grad_norm = torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(),
+                        self.config.gradient_clip_value
+                    )
+                    # Log gradient norm if too large
+                    if grad_norm > self.config.gradient_clip_value * 2:
+                        self.logger.warning(f"Large gradient norm: {grad_norm:.2f}")
+                        
+                # Optimizer step
+                self.optimizer.step()
+                
+                # Statistics
+                total_loss += loss.item()
+                if targets.dim() == 1:  # Classification
+                    predicted = outputs.argmax(dim=1)
+                    total_correct += (predicted == targets).sum().item()
+                total_samples += targets.size(0)
+                
+                # Record metrics
+                self.metrics_collector.record_events_processed(data.size(0))
+                
+                # Reset error counter on success
+                self.consecutive_errors = 0
+                
+                # Update progress bar
+                current_acc = total_correct / total_samples if total_samples > 0 else 0.0
+                pbar.set_postfix({
+                    'loss': f"{total_loss / (batch_idx + 1):.4f}",
+                    'acc': f"{current_acc:.4f}"
+                })
+                
+            except Exception as e:
+                self.error_count += 1
+                self.consecutive_errors += 1
+                self.metrics_collector.record_error("training_batch")
+                self.logger.error(f"Training batch {batch_idx} failed: {e}")
+                
+                if self.consecutive_errors >= self.max_consecutive_errors:
+                    self.logger.error("Too many consecutive training errors, stopping epoch")
+                    raise RuntimeError(f"Training failed after {self.consecutive_errors} consecutive errors")
+                    
+                continue
+        
+        epoch_time = time.time() - epoch_start_time
+        self.logger.info(f"Epoch {epoch} completed in {epoch_time:.1f}s")
+        
         return {
             'loss': total_loss / len(train_loader),
-            'accuracy': total_correct / total_samples if total_samples > 0 else 0.0
+            'accuracy': total_correct / total_samples if total_samples > 0 else 0.0,
+            'epoch_time': epoch_time,
+            'error_count': self.error_count
         }
         
     def validate_epoch(

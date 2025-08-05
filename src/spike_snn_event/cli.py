@@ -39,20 +39,30 @@ def train_command(args):
     logger = logging.getLogger(__name__)
     logger.info("Starting training...")
     
+    # Validate environment
+    if not torch.cuda.is_available() and not args.cpu:
+        logger.warning("CUDA not available, falling back to CPU")
+    
     # Load configuration
     if args.config:
-        with open(args.config, 'r') as f:
-            if args.config.endswith('.yaml') or args.config.endswith('.yml'):
-                config_dict = yaml.safe_load(f)
-            else:
-                config_dict = json.load(f)
-        config = create_training_config(**config_dict)
+        try:
+            with open(args.config, 'r') as f:
+                if args.config.endswith('.yaml') or args.config.endswith('.yml'):
+                    config_dict = yaml.safe_load(f)
+                else:
+                    config_dict = json.load(f)
+            config = create_training_config(**config_dict)
+            logger.info(f"Loaded configuration from {args.config}")
+        except Exception as e:
+            logger.error(f"Failed to load config file: {e}")
+            return 1
     else:
         config = create_training_config(
             learning_rate=args.learning_rate,
             epochs=args.epochs,
             batch_size=args.batch_size
         )
+        logger.info("Using default configuration")
     
     # Create model
     if args.model == "spiking_yolo":
