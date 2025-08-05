@@ -15,6 +15,7 @@ from queue import Queue
 import logging
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from .validation import validate_events, validate_image_dimensions, safe_operation, ValidationError
 
 
 @dataclass
@@ -94,6 +95,7 @@ class DVSCamera:
         except:
             return None
             
+    @safe_operation
     def stream(self, duration: Optional[float] = None) -> Iterator[np.ndarray]:
         """Stream events from camera (simulated for demo).
         
@@ -106,23 +108,40 @@ class DVSCamera:
         start_time = time.time()
         event_count = 0
         
-        while True:
-            if duration and (time.time() - start_time) > duration:
-                break
-                
-            # Simulate event generation (replace with actual camera interface)
-            num_events = np.random.poisson(100)  # Average 100 events per batch
-            
-            if num_events > 0:
-                events = self._generate_synthetic_events(num_events)
-                
-                if self.noise_filter:
-                    events = self._apply_noise_filter(events)
+        self.logger.info(f"Starting event stream (duration: {duration}s)")
+        
+        try:
+            while True:
+                if duration and (time.time() - start_time) > duration:
+                    break
                     
-                yield events
-                event_count += len(events)
+                # Simulate event generation (replace with actual camera interface)
+                num_events = np.random.poisson(100)  # Average 100 events per batch
                 
-            time.sleep(0.01)  # 10ms between batches
+                if num_events > 0:
+                    events = self._generate_synthetic_events(num_events)
+                    
+                    # Validate events before filtering
+                    try:
+                        events = validate_events(events)
+                    except ValidationError as e:
+                        self.logger.warning(f"Generated invalid events: {e}")
+                        continue
+                    
+                    if self.config.noise_filter:
+                        events = self._apply_noise_filter(events)
+                        
+                    yield events
+                    event_count += len(events)
+                    
+                time.sleep(0.01)  # 10ms between batches
+                
+        except Exception as e:
+            self.logger.error(f"Event streaming failed: {e}")
+            raise
+        finally:
+            runtime = time.time() - start_time
+            self.logger.info(f"Stream completed: {event_count} events in {runtime:.1f}s")
             
     def _stream_worker(self, duration: Optional[float] = None):
         """Background thread for continuous event generation."""
@@ -220,6 +239,61 @@ class DVSCamera:
         total_pixels = (x_max - x_min) * (y_max - y_min)
         
         return recent_count / total_pixels if total_pixels > 0 else 0.0
+        
+    def health_check(self) -> Dict[str, Any]:
+        """Perform health check on camera system.
+        
+        Returns:
+            Dictionary with health status information
+        """
+        health_status = {
+            'status': 'healthy',
+            'timestamp': time.time(),
+            'issues': [],
+            'metrics': {}
+        }
+        
+        try:
+            # Check streaming status
+            health_status['metrics']['is_streaming'] = self.is_streaming
+            
+            # Check queue status
+            queue_size = self._event_queue.qsize()
+            health_status['metrics']['queue_size'] = queue_size
+            
+            if queue_size > 800:  # Near max capacity
+                health_status['issues'].append('Event queue near capacity')
+                health_status['status'] = 'warning'
+            elif queue_size == 1000:  # Max capacity
+                health_status['issues'].append('Event queue full')
+                health_status['status'] = 'critical'
+                
+            # Check processing statistics
+            health_status['metrics']['events_processed'] = self.stats['events_processed']
+            health_status['metrics']['events_filtered'] = self.stats['events_filtered']
+            
+            filter_rate = (self.stats['events_filtered'] / 
+                          max(1, self.stats['events_processed'] + self.stats['events_filtered']))
+            health_status['metrics']['filter_rate'] = filter_rate
+            
+            if filter_rate > 0.8:  # More than 80% filtered
+                health_status['issues'].append('High event filter rate')
+                health_status['status'] = 'warning'
+                
+            # Check sensor configuration
+            health_status['metrics']['sensor_type'] = self.sensor_type
+            health_status['metrics']['resolution'] = [self.width, self.height]
+            health_status['metrics']['config'] = {
+                'noise_filter': self.config.noise_filter,
+                'refractory_period': self.config.refractory_period,
+                'hot_pixel_threshold': self.config.hot_pixel_threshold
+            }
+            
+        except Exception as e:
+            health_status['status'] = 'error'
+            health_status['issues'].append(f'Health check failed: {e}')
+            
+        return health_status
         
     def visualize_detections(
         self, 
