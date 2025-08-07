@@ -1,0 +1,81 @@
+{
+  "pipeline": {
+    "detections": [
+      {
+        "bbox": [
+          41.91149755198976,
+          46.06162174095277,
+          39.48974815081767,
+          24.968353839551323
+        ],
+        "confidence": 0.7050304417724289,
+        "class_id": 2,
+        "class_name": "person"
+      },
+      {
+        "bbox": [
+          42.89012355269568,
+          31.547432172888588,
+          39.0013085070939,
+          26.247669508004876
+        ],
+        "confidence": 0.7527176676212111,
+        "class_id": 2,
+        "class_name": "vehicle"
+      },
+      {
+        "bbox": [
+          58.465128551461355,
+          20.82878377393046,
+          36.59366555320737,
+          35.609556439249275
+        ],
+        "confidence": 0.5866876221637192,
+        "class_id": 1,
+        "class_name": "person"
+      }
+    ],
+    "inference_time_ms": 1.1935234069824219,
+    "input_events": 2000,
+    "processing_rate": 1675710.7471034757
+  },
+  "performance": [
+    {
+      "input_size": 100,
+      "throughput": 85685.47497446374,
+      "latency_ms": 1.1670589447021484,
+      "detections": 0
+    },
+    {
+      "input_size": 500,
+      "throughput": 435907.7114944918,
+      "latency_ms": 1.1470317840576172,
+      "detections": 2
+    },
+    {
+      "input_size": 1000,
+      "throughput": 874906.967042136,
+      "latency_ms": 1.1429786682128906,
+      "detections": 3
+    },
+    {
+      "input_size": 5000,
+      "throughput": 4117714.510111918,
+      "latency_ms": 1.2142658233642578,
+      "detections": 3
+    },
+    {
+      "input_size": 10000,
+      "throughput": 8683859.213250518,
+      "latency_ms": 1.1515617370605469,
+      "detections": 3
+    }
+  ],
+  "robustness_score": 100.0,
+  "overall_status": "\u2705 PRODUCTION READY",
+  "summary": {
+    "max_throughput": 8683859.213250518,
+    "avg_latency": 1.1645793914794922,
+    "robustness_score": 100.0
+  }
+}

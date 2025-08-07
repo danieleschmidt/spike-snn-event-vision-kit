@@ -1,0 +1,93 @@
+{
+  "test_results": [
+    {
+      "test_name": "Normal events",
+      "status": "success",
+      "security_events": 1,
+      "validation_errors": 1
+    },
+    {
+      "test_name": "Malicious large coordinates",
+      "status": "success",
+      "security_events": 50,
+      "validation_errors": 0
+    },
+    {
+      "test_name": "Invalid timestamps",
+      "status": "success",
+      "security_events": 2,
+      "validation_errors": 0
+    },
+    {
+      "test_name": "Malformed events",
+      "status": "success",
+      "security_events": 0,
+      "validation_errors": 5
+    },
+    {
+      "test_name": "Attack pattern",
+      "status": "success",
+      "security_events": 1,
+      "validation_errors": 1
+    },
+    {
+      "test_name": "Resource exhaustion",
+      "status": "success",
+      "security_events": 2,
+      "validation_errors": 2
+    },
+    {
+      "test_name": "Mixed threats",
+      "status": "success",
+      "security_events": 1,
+      "validation_errors": 1
+    }
+  ],
+  "system_report": {
+    "processing_statistics": {
+      "events_processed": 151258,
+      "errors_encountered": 0,
+      "recoveries_attempted": 0,
+      "successful_recoveries": 0
+    },
+    "circuit_breaker": {
+      "is_open": false,
+      "failure_count": 0,
+      "threshold": 5
+    },
+    "system_health": {
+      "system_status": "healthy",
+      "average_metrics": {
+        "cpu_usage": 47.8,
+        "memory_usage": 15.4,
+        "throughput": 1000.0,
+        "error_rate": 0.0
+      },
+      "latest_metrics": {
+        "cpu_usage": 47.8,
+        "memory_usage": 15.4,
+        "disk_usage": 59.8,
+        "throughput": 1000.0,
+        "error_rate": 0.0
+      },
+      "uptime_minutes": 0.08333333333333333,
+      "data_points": 1
+    },
+    "security_summary": {
+      "total_security_events": 57,
+      "threat_breakdown": {
+        "malicious_input": 53,
+        "data_injection": 3,
+        "resource_exhaustion": 1
+      },
+      "severity_breakdown": {
+        "HIGH": 4,
+        "MEDIUM": 53
+      },
+      "last_24h_events": 57,
+      "mitigation_rate": 0.0
+    },
+    "reliability_score": 70.0
+  },
+  "timestamp": 1754541316.3484073
+}

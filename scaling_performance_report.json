@@ -1,0 +1,87 @@
+{
+  "test_results": [
+    {
+      "scenario": "Small batches",
+      "throughput": 467123.7331551398,
+      "processing_time": 0.0021407604217529297,
+      "cache_hit_rate": 100.0,
+      "success_rate": 100.0,
+      "workers": 2,
+      "total_events": 1000,
+      "detections": 10
+    },
+    {
+      "scenario": "Medium batches",
+      "throughput": 5964596.131968145,
+      "processing_time": 0.0016765594482421875,
+      "cache_hit_rate": 100.0,
+      "success_rate": 100.0,
+      "workers": 2,
+      "total_events": 10000,
+      "detections": 20
+    },
+    {
+      "scenario": "Large batches",
+      "throughput": 17896842.4645844,
+      "processing_time": 0.005587577819824219,
+      "cache_hit_rate": 100.0,
+      "success_rate": 100.0,
+      "workers": 4,
+      "total_events": 100000,
+      "detections": 50
+    },
+    {
+      "scenario": "Mixed workload",
+      "throughput": 4107290.2945016683,
+      "processing_time": 0.0032868385314941406,
+      "cache_hit_rate": 100.0,
+      "success_rate": 100.0,
+      "workers": 2,
+      "total_events": 13500,
+      "detections": 30
+    },
+    {
+      "scenario": "High-volume stress test",
+      "throughput": 55927036.10859246,
+      "processing_time": 0.00894021987915039,
+      "cache_hit_rate": 100.0,
+      "success_rate": 100.0,
+      "workers": 4,
+      "total_events": 500000,
+      "detections": 100
+    }
+  ],
+  "system_stats": {
+    "performance": {
+      "average_throughput_eps": 17129078.429411374,
+      "average_latency_ms": 0.11972188949584961,
+      "peak_throughput_eps": 56779531.609584406,
+      "min_latency_ms": 0.08182525634765625
+    },
+    "scaling": {
+      "current_workers": 4,
+      "max_workers": 4,
+      "adaptive_scaling": true
+    },
+    "cache": {
+      "size": 9,
+      "max_size": 10000,
+      "hit_rate": 100.0,
+      "hit_count": 210,
+      "miss_count": 0,
+      "most_accessed": {
+        "5000_27f08abbb2419612": 105,
+        "2000_c1898a7b1e15333f": 55,
+        "500_5964f0e192fea2ec": 25,
+        "100_5e8346c2333dd177": 15,
+        "50_5e8346c2333dd177": 7
+      }
+    },
+    "system": {
+      "uptime_seconds": 0.7375404834747314,
+      "processed_batches": 210,
+      "average_processing_time_ms": 0.10144937606084914
+    }
+  },
+  "timestamp": 1754541413.1276102
+}
