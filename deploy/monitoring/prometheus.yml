@@ -1,0 +1,15 @@
+global:
+  evaluation_interval: 15s
+  scrape_interval: 15s
+rule_files: []
+scrape_configs:
+- job_name: neuromorphic-vision
+  metrics_path: /metrics
+  scrape_interval: 5s
+  static_configs:
+  - targets:
+    - neuromorphic-vision:9091
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - localhost:9090

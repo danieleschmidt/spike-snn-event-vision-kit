@@ -1,0 +1,75 @@
+networks:
+  neuromorphic-net:
+    driver: bridge
+services:
+  grafana:
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    image: grafana/grafana:latest
+    networks:
+    - neuromorphic-net
+    ports:
+    - 3000:3000
+    restart: unless-stopped
+    volumes:
+    - grafana-storage:/var/lib/grafana
+    - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+  neuromorphic-vision:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neuromorphic-vision-processor
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      CACHE_SIZE: '10000'
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+      MAX_WORKERS: '4'
+    healthcheck:
+      interval: 30s
+      retries: 3
+      start_period: 30s
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8080/health
+      timeout: 10s
+    image: neuromorphic-vision:v1.0.0
+    networks:
+    - neuromorphic-net
+    ports:
+    - 8080:8080
+    restart: unless-stopped
+    volumes:
+    - ./config:/app/config:ro
+    - ./logs:/app/logs
+    - ./data:/app/data
+  prometheus:
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --web.console.libraries=/etc/prometheus/console_libraries
+    - --web.console.templates=/etc/prometheus/consoles
+    - --storage.tsdb.retention.time=200h
+    - --web.enable-lifecycle
+    container_name: prometheus
+    image: prom/prometheus:latest
+    networks:
+    - neuromorphic-net
+    ports:
+    - 9090:9090
+    restart: unless-stopped
+    volumes:
+    - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+version: '3.8'
+volumes:
+  grafana-storage: {}

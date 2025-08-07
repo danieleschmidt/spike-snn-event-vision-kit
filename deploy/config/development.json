@@ -1,0 +1,47 @@
+{
+  "application": {
+    "name": "neuromorphic-vision-processor",
+    "version": "1.0.0",
+    "environment": "development"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8081,
+    "workers": 4,
+    "timeout": 30
+  },
+  "processing": {
+    "max_batch_size": 10000,
+    "cache_size": 10000,
+    "cache_ttl": 3600,
+    "auto_scaling": true,
+    "min_workers": 1,
+    "max_workers": 8
+  },
+  "security": {
+    "input_validation": true,
+    "threat_detection": true,
+    "max_coordinate_value": 1000,
+    "max_events_per_batch": 100000,
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 1000
+    }
+  },
+  "logging": {
+    "level": "DEBUG",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "/app/logs/neuromorphic-vision.log",
+    "max_size": "10MB",
+    "backup_count": 5
+  },
+  "monitoring": {
+    "metrics_enabled": true,
+    "health_check_interval": 30,
+    "prometheus_port": 9091
+  },
+  "database": {
+    "enabled": false,
+    "url": "postgresql://user:pass@localhost/neuromorphic"
+  }
+}

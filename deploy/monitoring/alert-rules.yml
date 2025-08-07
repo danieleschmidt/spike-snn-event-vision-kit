@@ -1,0 +1,19 @@
+groups:
+- name: neuromorphic-vision-alerts
+  rules:
+  - alert: HighProcessingLatency
+    annotations:
+      description: 95th percentile latency is above 100ms for 5 minutes
+      summary: High processing latency detected
+    expr: histogram_quantile(0.95, processing_latency_seconds) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+  - alert: LowCacheHitRate
+    annotations:
+      description: Cache hit rate is below 50% for 10 minutes
+      summary: Low cache hit rate
+    expr: cache_hit_rate < 50
+    for: 10m
+    labels:
+      severity: warning

@@ -1,0 +1,63 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Neuromorphic Vision Processing",
+    "tags": [
+      "neuromorphic",
+      "vision",
+      "processing"
+    ],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Events Processed per Second",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(events_processed_total[5m])",
+            "legendFormat": "Events/sec"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Processing Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, processing_latency_seconds)",
+            "legendFormat": "95th percentile"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Cache Hit Rate",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "cache_hit_rate",
+            "legendFormat": "Hit Rate %"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Active Workers",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "active_workers",
+            "legendFormat": "Workers"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s"
+  }
+}

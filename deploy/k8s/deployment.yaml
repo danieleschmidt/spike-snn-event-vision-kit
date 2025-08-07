@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: neuromorphic-vision
+    tier: processing
+    version: v1.0.0
+  name: neuromorphic-vision-processor
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: neuromorphic-vision
+  template:
+    metadata:
+      labels:
+        app: neuromorphic-vision
+    spec:
+      containers:
+      - env:
+        - name: ENVIRONMENT
+          value: production
+        - name: LOG_LEVEL
+          value: INFO
+        - name: MAX_WORKERS
+          value: '4'
+        - name: CACHE_SIZE
+          value: '10000'
+        image: neuromorphic-vision:v1.0.0
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: vision-processor
+        ports:
+        - containerPort: 8080
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
