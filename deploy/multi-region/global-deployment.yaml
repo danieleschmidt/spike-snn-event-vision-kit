@@ -1,0 +1,546 @@
+# Multi-Region Global Deployment Configuration
+# Terragon SDLC v4.0 - Production-Ready Neuromorphic Vision System
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-deployment-config
+  namespace: spike-snn-vision
+  labels:
+    app: spike-snn-event
+    version: v4.0
+    deployment: global
+data:
+  # Global configuration
+  global.yaml: |
+    global:
+      version: "4.0.0"
+      environment: production
+      
+      # Multi-region configuration
+      regions:
+        - name: us-east-1
+          primary: true
+          compliance: ["CCPA"]
+          languages: ["en", "es"]
+          endpoints:
+            - us-east-1.neuromorphic.terragon.ai
+          
+        - name: eu-central-1
+          primary: false
+          compliance: ["GDPR"]
+          languages: ["en", "de", "fr"]
+          endpoints:
+            - eu-central-1.neuromorphic.terragon.ai
+            
+        - name: ap-southeast-1
+          primary: false
+          compliance: ["PDPA"]
+          languages: ["en", "ja", "zh"]
+          endpoints:
+            - ap-southeast-1.neuromorphic.terragon.ai
+            
+        - name: ap-northeast-1
+          primary: false
+          compliance: ["PIPL", "GDPR"]
+          languages: ["ja", "zh", "en"]
+          endpoints:
+            - ap-northeast-1.neuromorphic.terragon.ai
+            
+        - name: sa-east-1
+          primary: false
+          compliance: ["LGPD"]
+          languages: ["es", "en"]
+          endpoints:
+            - sa-east-1.neuromorphic.terragon.ai
+      
+      # Load balancing
+      load_balancer:
+        algorithm: geo_proximity
+        health_check_interval: 30s
+        failover_threshold: 3
+        sticky_sessions: false
+        
+      # Content delivery
+      cdn:
+        enabled: true
+        providers: ["cloudflare", "aws_cloudfront"]
+        cache_ttl: 3600
+        edge_locations: 
+          - us-east-1
+          - eu-central-1
+          - ap-southeast-1
+          - ap-northeast-1
+          - sa-east-1
+      
+      # Security
+      security:
+        encryption_in_transit: true
+        encryption_at_rest: true
+        certificate_authority: letsencrypt
+        tls_version: "1.3"
+        rate_limiting:
+          requests_per_minute: 1000
+          burst_limit: 100
+          
+      # Compliance
+      compliance:
+        gdpr:
+          enabled: true
+          data_retention_days: 365
+          consent_management: true
+          right_to_be_forgotten: true
+          
+        ccpa:
+          enabled: true
+          opt_out_mechanism: true
+          data_sale_prohibition: true
+          
+        pdpa:
+          enabled: true
+          notification_requirements: true
+          consent_withdrawal: true
+          
+      # Monitoring
+      monitoring:
+        metrics_retention: 30d
+        log_retention: 90d
+        alerting:
+          webhooks:
+            - https://hooks.slack.com/neuromorphic-alerts
+            - https://alerts.terragon.ai/webhook
+        
+        performance_targets:
+          latency_p95: 100ms
+          availability: 99.9%
+          error_rate: 0.1%
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spike-snn-global
+  namespace: spike-snn-vision
+  labels:
+    app: spike-snn-event
+    tier: application
+    deployment: global
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: spike-snn-event
+  template:
+    metadata:
+      labels:
+        app: spike-snn-event
+        tier: application
+    spec:
+      serviceAccountName: spike-snn-service-account
+      
+      # Multi-region node affinity
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/zone
+                operator: In
+                values: ["us-east-1a", "us-east-1b", "us-east-1c"]
+                
+      # Anti-affinity for high availability
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values: ["spike-snn-event"]
+          topologyKey: kubernetes.io/hostname
+      
+      containers:
+      - name: spike-snn-application
+        image: terragon/spike-snn-event:v4.0.0
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+          
+        # Multi-region environment variables
+        env:
+        - name: DEPLOYMENT_REGION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['deployment.region']
+        - name: DEPLOYMENT_ZONE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: COMPLIANCE_REGULATIONS
+          value: "GDPR,CCPA,PDPA"
+        - name: SUPPORTED_LANGUAGES
+          value: "en,es,fr,de,ja,zh"
+        - name: DATA_RESIDENCY_ENABLED
+          value: "true"
+        - name: PRIVACY_BY_DESIGN
+          value: "true"
+        
+        # Resource requirements for production
+        resources:
+          requests:
+            cpu: "1.0"
+            memory: "2Gi"
+            nvidia.com/gpu: 0  # Optional GPU
+          limits:
+            cpu: "2.0"
+            memory: "4Gi"
+            nvidia.com/gpu: 1
+            
+        # Liveness and readiness probes
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          
+        # Volume mounts
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/spike-snn
+          readOnly: true
+        - name: data-volume
+          mountPath: /var/lib/spike-snn
+        - name: cert-volume
+          mountPath: /etc/ssl/certs/spike-snn
+          readOnly: true
+          
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_BIND_SERVICE
+            
+      # Sidecar for monitoring
+      - name: metrics-exporter
+        image: prom/node-exporter:latest
+        ports:
+        - containerPort: 9100
+          name: node-metrics
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
+            
+      volumes:
+      - name: config-volume
+        configMap:
+          name: global-deployment-config
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: spike-snn-data-pvc
+      - name: cert-volume
+        secret:
+          secretName: spike-snn-tls-certs
+          
+      # DNS configuration for multi-region
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+        - name: edns0
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spike-snn-global-service
+  namespace: spike-snn-vision
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    external-dns.alpha.kubernetes.io/hostname: neuromorphic.terragon.ai
+spec:
+  type: LoadBalancer
+  selector:
+    app: spike-snn-event
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  sessionAffinity: None
+  
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: spike-snn-global-ingress
+  namespace: spike-snn-vision
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      # GDPR compliance headers
+      add_header X-Content-Type-Options nosniff;
+      add_header X-Frame-Options DENY;
+      add_header X-XSS-Protection "1; mode=block";
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload";
+      
+      # Geo-blocking for compliance
+      if ($geoip_country_code ~ ^(CN|RU)$) {
+        return 451;  # Unavailable for legal reasons
+      }
+      
+spec:
+  tls:
+  - hosts:
+    - neuromorphic.terragon.ai
+    - "*.neuromorphic.terragon.ai"
+    secretName: spike-snn-tls-secret
+    
+  rules:
+  - host: neuromorphic.terragon.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: spike-snn-global-service
+            port:
+              number: 80
+              
+  # Regional routing
+  - host: us-east-1.neuromorphic.terragon.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: spike-snn-us-service
+            port:
+              number: 80
+              
+  - host: eu-central-1.neuromorphic.terragon.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: spike-snn-eu-service
+            port:
+              number: 80
+              
+  - host: ap-southeast-1.neuromorphic.terragon.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: spike-snn-ap-service
+            port:
+              number: 80
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spike-snn-data-pvc
+  namespace: spike-snn-vision
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3-encrypted
+  resources:
+    requests:
+      storage: 100Gi
+      
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: spike-snn-hpa
+  namespace: spike-snn-vision
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: spike-snn-global
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: events_processed_per_second
+      target:
+        type: AverageValue
+        averageValue: "1000"
+        
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: spike-snn-pdb
+  namespace: spike-snn-vision
+spec:
+  selector:
+    matchLabels:
+      app: spike-snn-event
+  minAvailable: 2
+  
+---
+# Service Account with RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spike-snn-service-account
+  namespace: spike-snn-vision
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: spike-snn-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: spike-snn-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: spike-snn-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: spike-snn-service-account
+  namespace: spike-snn-vision
+
+---
+# Network Policies for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spike-snn-network-policy
+  namespace: spike-snn-vision
+spec:
+  podSelector:
+    matchLabels:
+      app: spike-snn-event
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+  - ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8443
+  egress:
+  - to: []  # Allow all egress
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: UDP
+      port: 53
