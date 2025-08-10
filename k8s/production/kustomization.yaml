@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+commonLabels:
+  app: spike-snn-app
+  environment: production
+images:
+- name: spike-snn-event
+  newTag: v1.0.0
+kind: Kustomization
+namespace: spike-snn-production
+resources:
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+- configmap.yaml
+- hpa.yaml

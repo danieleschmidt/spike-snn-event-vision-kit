@@ -1,14 +1,6 @@
-# Version control
+# Git
 .git
 .gitignore
-.gitattributes
-
-# Documentation
-*.md
-docs/
-README*
-CHANGELOG*
-LICENSE*
 
 # Python
 __pycache__/
@@ -31,9 +23,15 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
-# Virtual environments
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Environment
 .env
 .venv
 env/
@@ -42,213 +40,31 @@ ENV/
 env.bak/
 venv.bak/
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Testing
-.coverage
-.pytest_cache/
-.tox/
-.nox/
-htmlcov/
-.hypothesis/
-cover/
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-
-# Jupyter
-.ipynb_checkpoints
-
-# MacOS
+# OS
 .DS_Store
-
-# Windows
 Thumbs.db
-ehthumbs.db
-Desktop.ini
 
-# Docker
-Dockerfile*
-docker-compose*
-.dockerignore
+# Documentation
+docs/_build/
+*.md
+README.md
 
-# CI/CD
-.github/
-.travis.yml
-.circleci/
-azure-pipelines.yml
-Jenkinsfile
-
-# Large files and data
-*.pth
-*.onnx
-*.h5
-*.pb
-*.tflite
-*.net
-models/
-datasets/
-data/
-checkpoints/
-*.aedat
-*.dat
-*.es
-*.raw
+# Development
+.pre-commit-config.yaml
+tox.ini
+setup.cfg
 
 # Logs
 *.log
 logs/
 
-# Temporary files
-*.tmp
-*.temp
-
-# Cache
-.cache/
-.mypy_cache/
-.ruff_cache/
-
-# Pre-commit
-.pre-commit-config.yaml
-
-# Package managers
-poetry.lock
-Pipfile.lock
-.pdm-python
-.pdm-build/
-
-# Security and secrets
-.secrets/
-*.pem
-*.key
-*.crt
-*.p12
-*.pfx
-.env.*
-.vault
-credentials.json
-service-account.json
-
-# Monitoring and profiling
-wandb/
-mlruns/
-tensorboard/
-.wandb/
-lightning_logs/
-*.prof
-profile.stats
-.memory_profiler/
-
-# Development and debugging
-core.*
-*.dump
-*.stackdump
-debug.log
-trace.log
-
-# Archive files
-*.zip
-*.tar
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.7z
-*.rar
-*.iso
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-*.db-journal
-
-# Backup files
-*.backup
-*.bak
-*.old
-*.orig
-*~
-
-# Node.js (if any frontend components)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.npm/
-.yarn/
-
-# OS-specific
-# Linux
-*~
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-.Trashes
-
-# IDE and editor files
-.vscode/
-.idea/
-*.sublime-*
-*.code-workspace
-.history/
-*.swp
-*.swo
-*.tmp
-*~
-
-# Package build artifacts
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Local development
-.local/
-local_settings.py
-settings_local.py
-.env.local
-.env.development
-.env.production
-
-# Documentation source (keep built docs out)
-docs/_build/
-docs/build/
-site/
-
-# Project-specific large files
-experiments/
-results/
-outputs/
-benchmarks/results/
-profiling/
-analysis/
+# Temporary
+tmp/
+temp/

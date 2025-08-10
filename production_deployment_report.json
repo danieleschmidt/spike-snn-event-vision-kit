@@ -1,0 +1,115 @@
+{
+  "timestamp": 1754836360.5280077,
+  "overall_status": "SUCCESS",
+  "runtime_seconds": 0.021170377731323242,
+  "deployment_summary": {
+    "total_steps": 3,
+    "successful_steps": 3,
+    "failed_steps": 0,
+    "success_rate": 1.0
+  },
+  "artifacts_summary": {
+    "total_artifacts": 14,
+    "artifacts_by_category": {
+      "Docker": 3,
+      "Kubernetes": 6,
+      "Monitoring": 4,
+      "Scripts": 1
+    }
+  },
+  "issues_summary": {
+    "total_issues": 0,
+    "total_warnings": 0
+  },
+  "detailed_results": {
+    "Containerization": {
+      "success": true,
+      "artifacts_created": [
+        "/root/repo/Dockerfile.production",
+        "/root/repo/.dockerignore",
+        "/root/repo/docker-compose.production.yml",
+        "/root/repo/scripts/health_check.py"
+      ],
+      "issues": [],
+      "warnings": [],
+      "execution_time_ms": 4.127740859985352
+    },
+    "Kubernetes Deployment": {
+      "success": true,
+      "artifacts_created": [
+        "/root/repo/k8s/production/deployment.yaml",
+        "/root/repo/k8s/production/service.yaml",
+        "/root/repo/k8s/production/ingress.yaml",
+        "/root/repo/k8s/production/configmap.yaml",
+        "/root/repo/k8s/production/hpa.yaml",
+        "/root/repo/k8s/production/kustomization.yaml"
+      ],
+      "issues": [],
+      "warnings": [],
+      "execution_time_ms": 11.312246322631836
+    },
+    "Monitoring Setup": {
+      "success": true,
+      "artifacts_created": [
+        "/root/repo/monitoring/production/prometheus.yml",
+        "/root/repo/monitoring/production/grafana-dashboard.json",
+        "/root/repo/monitoring/production/alert-rules.yml",
+        "/root/repo/monitoring/production/monitoring-deployment.yaml"
+      ],
+      "issues": [],
+      "warnings": [],
+      "execution_time_ms": 5.417585372924805
+    }
+  },
+  "recommendations": [
+    "All deployment artifacts created successfully",
+    "System ready for production deployment",
+    "Configure SSL certificates for HTTPS",
+    "Set up domain DNS configuration",
+    "Create production secrets and ConfigMaps",
+    "Run final security scan before deployment",
+    "Test deployment in staging environment first"
+  ],
+  "production_checklist": [
+    [
+      "\u2705 Docker containers ready",
+      true
+    ],
+    [
+      "\u2705 Kubernetes manifests created",
+      true
+    ],
+    [
+      "\u2705 Monitoring stack configured",
+      true
+    ],
+    [
+      "\u2705 Health checks implemented",
+      true
+    ],
+    [
+      "\u2705 Security policies applied",
+      true
+    ],
+    [
+      "\u2705 Auto-scaling configured",
+      true
+    ],
+    [
+      "\u2705 Deployment guide created",
+      true
+    ],
+    [
+      "\u26a0\ufe0f SSL certificates",
+      false
+    ],
+    [
+      "\u26a0\ufe0f Domain configuration",
+      false
+    ],
+    [
+      "\u26a0\ufe0f Production secrets",
+      false
+    ]
+  ]
+}
