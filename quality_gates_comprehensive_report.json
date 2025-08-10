@@ -1,0 +1,232 @@
+{
+  "timestamp": 1754836184.9381366,
+  "overall_status": "FAILED",
+  "overall_score": 0.6672169385082553,
+  "runtime_seconds": 1.496410846710205,
+  "gates_summary": {
+    "total_gates": 5,
+    "passed_gates": 2,
+    "failed_gates": 3,
+    "pass_rate": 0.4
+  },
+  "issues_summary": {
+    "total_issues": 34,
+    "total_warnings": 54,
+    "critical_issues": []
+  },
+  "execution_performance": {
+    "total_execution_time_ms": 4248.370170593262,
+    "execution_times_by_gate": {
+      "Dependency Vulnerability Scan": 2.591371536254883,
+      "Performance Validation": 230.2229404449463,
+      "Security Vulnerability Scan": 1099.2960929870605,
+      "Code Quality Analysis": 1424.5281219482422,
+      "Comprehensive Testing": 1491.7316436767578
+    },
+    "parallel_efficiency": 0.3522317469104251
+  },
+  "detailed_results": {
+    "Dependency Security Scan": {
+      "gate_name": "Dependency Vulnerability Scan",
+      "passed": true,
+      "score": 0.6,
+      "issues": [],
+      "warnings": [
+        "Could not parse requirements.txt: cannot access local variable 're' where it is not associated with a value",
+        "Potentially vulnerable dependency: pyyaml - versions < 5.4 have security issues",
+        "Potentially vulnerable dependency: pillow - versions < 8.3.2 have security issues"
+      ],
+      "metrics": {
+        "dependencies_found": 26,
+        "requirements_files": [
+          "requirements.txt",
+          "pyproject.toml"
+        ],
+        "dependency_analysis": {
+          "total_dependencies": 26,
+          "potentially_vulnerable": 2,
+          "vulnerable_packages": [
+            "pyyaml",
+            "pillow"
+          ]
+        }
+      },
+      "execution_time_ms": 2.591371536254883
+    },
+    "Performance Validation": {
+      "gate_name": "Performance Validation",
+      "passed": true,
+      "score": 1.0,
+      "issues": [],
+      "warnings": [],
+      "metrics": {
+        "startup_time_ms": 1407.357797403682,
+        "memory_usage_mb": 13.728,
+        "throughput_ops_sec": 3037974.250812383,
+        "response_time_ms": 12.156105041503906,
+        "performance_score": 1.0,
+        "benchmark_results": {}
+      },
+      "execution_time_ms": 230.2229404449463
+    },
+    "Security Vulnerability Scan": {
+      "gate_name": "Security Vulnerability Scan",
+      "passed": false,
+      "score": 0.0,
+      "issues": [
+        "Security vulnerability (dangerous_functions) in autonomous_quality_gates_final.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in autonomous_quality_gates_final.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in examples/advanced_scaling.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/advanced_scaling.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/advanced_scaling.py: 2 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/cli.py: 3 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/health.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/models.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/optimization.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/quality_gates.py: 2 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/quality_gates.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/ros2_nodes.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/security.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/security.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/training.py: 2 matches found",
+        "Security vulnerability (dangerous_functions) in tests/benchmarks/test_performance.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in tests/integration/test_end_to_end.py: 1 matches found"
+      ],
+      "warnings": [
+        "Potential security issue (injection_vulnerabilities) in autonomous_quality_gates_final.py: 54 matches found",
+        "Potential security issue (injection_vulnerabilities) in autonomous_sdlc_completion_final.py: 18 matches found",
+        "Potential security issue (injection_vulnerabilities) in comparative_performance_analysis.py: 23 matches found",
+        "Potential security issue (injection_vulnerabilities) in comprehensive_quality_gates.py: 15 matches found",
+        "Potential security issue (injection_vulnerabilities) in debug_validation.py: 12 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_basic.py: 25 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_generation1.py: 9 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_generation2.py: 22 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_generation3.py: 26 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_lightweight.py: 46 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_robust.py: 43 matches found",
+        "Potential security issue (injection_vulnerabilities) in enhanced_robustness_system.py: 46 matches found",
+        "Potential security issue (injection_vulnerabilities) in high_performance_scaling_system.py: 30 matches found",
+        "Potential security issue (injection_vulnerabilities) in production_deployment.py: 9 matches found",
+        "Potential security issue (injection_vulnerabilities) in production_deployment_final.py: 23 matches found",
+        "Potential security issue (injection_vulnerabilities) in quality_gates_validation.py: 31 matches found",
+        "Potential security issue (injection_vulnerabilities) in research_novel_snn_architectures.py: 20 matches found",
+        "Potential security issue (injection_vulnerabilities) in run_tests.py: 44 matches found",
+        "Potential security issue (injection_vulnerabilities) in test_basic_functionality.py: 26 matches found",
+        "Potential security issue (injection_vulnerabilities) in test_enhanced_validation.py: 26 matches found",
+        "Potential security issue (injection_vulnerabilities) in validate_final.py: 38 matches found",
+        "Potential security issue (injection_vulnerabilities) in validate_generation1.py: 5 matches found",
+        "Potential security issue (injection_vulnerabilities) in validate_generation2.py: 7 matches found",
+        "Potential security issue (injection_vulnerabilities) in validate_generation3.py: 8 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_autonomous_gen1_simple.py: 31 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_autonomous_gen1.py: 27 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_autonomous_gen2_robust.py: 103 matches found",
+        "Potential security issue (injection_vulnerabilities) in demo_autonomous_gen3_scaling.py: 50 matches found",
+        "Potential security issue (injection_vulnerabilities) in autonomous_quality_gates_comprehensive.py: 52 matches found",
+        "Potential security issue (injection_vulnerabilities) in examples/advanced_scaling.py: 52 matches found",
+        "Potential security issue (injection_vulnerabilities) in examples/basic_usage.py: 33 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/advanced_scaling.py: 18 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/cli.py: 69 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/compliance.py: 16 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/core.py: 13 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/datasets.py: 13 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/health.py: 4 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/i18n.py: 9 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/intelligent_cache.py: 19 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/lite_core.py: 6 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/models.py: 3 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/monitoring.py: 25 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/optimization.py: 14 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/quality_gates.py: 9 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/ros2_nodes.py: 14 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/scaling.py: 14 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/training.py: 22 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/validation.py: 59 matches found",
+        "Potential security issue (injection_vulnerabilities) in tests/benchmarks/test_performance.py: 2 matches found",
+        "Potential security issue (injection_vulnerabilities) in tests/fixtures/test_data.py: 2 matches found"
+      ],
+      "metrics": {
+        "files_scanned": 71,
+        "total_patterns_checked": 1420,
+        "vulnerabilities_by_type": {
+          "dangerous_functions": 22,
+          "injection_vulnerabilities": 1285,
+          "hardcoded_secrets": 0
+        },
+        "critical_files_found": [
+          "requirements.txt",
+          "pyproject.toml",
+          ".env.example"
+        ]
+      },
+      "execution_time_ms": 1099.2960929870605
+    },
+    "Code Quality Analysis": {
+      "gate_name": "Code Quality Analysis",
+      "passed": false,
+      "score": 0.8,
+      "issues": [
+        "High complexity in autonomous_quality_gates_final.py: 11 violations",
+        "High complexity in comprehensive_quality_gates.py: 13 violations",
+        "High complexity in demo_robust.py: 4 violations",
+        "High complexity in production_deployment_final.py: 6 violations",
+        "High complexity in quality_gates_validation.py: 4 violations",
+        "High complexity in research_novel_snn_architectures.py: 4 violations",
+        "High complexity in demo_autonomous_gen1.py: 4 violations",
+        "High complexity in demo_autonomous_gen2_robust.py: 17 violations",
+        "High complexity in demo_autonomous_gen3_scaling.py: 9 violations",
+        "High complexity in autonomous_quality_gates_comprehensive.py: 11 violations",
+        "High complexity in examples/advanced_scaling.py: 6 violations",
+        "High complexity in src/spike_snn_event/advanced_scaling.py: 4 violations",
+        "High complexity in src/spike_snn_event/core.py: 5 violations",
+        "High complexity in src/spike_snn_event/intelligent_cache.py: 4 violations",
+        "High complexity in src/spike_snn_event/quality_gates.py: 5 violations",
+        "Too many complexity violations: 160"
+      ],
+      "warnings": [
+        "Style issues in src/spike_snn_event/validation.py: 20 violations"
+      ],
+      "metrics": {
+        "files_analyzed": 71,
+        "total_lines": 30538,
+        "total_functions": 1032,
+        "complexity_violations": 160,
+        "style_violations": 57,
+        "maintainability_score": 0.6925358943669015,
+        "quality_breakdown": {
+          "complexity_score": 0.4230549864505774,
+          "style_score": 0.9620168022832258,
+          "violations_per_file": 3.056338028169014
+        }
+      },
+      "execution_time_ms": 1424.5281219482422
+    },
+    "Comprehensive Testing": {
+      "gate_name": "Comprehensive Testing",
+      "passed": false,
+      "score": 0.9360846925412765,
+      "issues": [
+        "5 tests failed"
+      ],
+      "warnings": [],
+      "metrics": {
+        "test_files_found": 14,
+        "test_functions_found": 138,
+        "tests_executed": 138,
+        "tests_passed": 133,
+        "tests_failed": 5,
+        "test_coverage_percent": 89.45595574401477,
+        "test_execution_time_ms": 15859.897906669741,
+        "test_categories": {
+          "unit": 138
+        }
+      },
+      "execution_time_ms": 1491.7316436767578
+    }
+  },
+  "recommendations": [
+    "Address security vulnerabilities before production deployment",
+    "Implement automated security scanning in CI/CD pipeline",
+    "Increase test coverage to at least 80%",
+    "Add integration and performance tests"
+  ]
+}

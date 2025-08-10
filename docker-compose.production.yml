@@ -1,0 +1,62 @@
+networks:
+  spike-snn-network:
+    driver: bridge
+services:
+  nginx-proxy:
+    container_name: spike-snn-nginx
+    depends_on:
+    - spike-snn-app
+    image: nginx:alpine
+    networks:
+    - spike-snn-network
+    ports:
+    - 80:80
+    - 443:443
+    restart: unless-stopped
+    volumes:
+    - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./nginx/ssl:/etc/nginx/ssl:ro
+    - nginx-logs:/var/log/nginx
+  redis-cache:
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    container_name: spike-snn-redis
+    image: redis:7-alpine
+    networks:
+    - spike-snn-network
+    restart: unless-stopped
+    volumes:
+    - redis-data:/data
+  spike-snn-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: production
+    container_name: spike-snn-production
+    environment:
+      SNN_CACHE_SIZE: '10000'
+      SNN_ENVIRONMENT: production
+      SNN_LOG_LEVEL: INFO
+      SNN_WORKERS: '4'
+    healthcheck:
+      interval: 30s
+      retries: 3
+      start_period: 40s
+      test:
+      - CMD
+      - python
+      - scripts/health_check.py
+      timeout: 10s
+    networks:
+    - spike-snn-network
+    ports:
+    - 8080:8080
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    volumes:
+    - /var/log/spike-snn:/app/logs
+    - /var/lib/spike-snn/models:/app/models:ro
+version: '3.8'
+volumes:
+  nginx-logs: {}
+  redis-data: {}

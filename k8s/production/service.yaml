@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: spike-snn-app
+  name: spike-snn-service
+  namespace: spike-snn-production
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: spike-snn-app
+  type: ClusterIP

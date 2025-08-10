@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: spike-snn-app
+    environment: production
+    version: v1.0.0
+  name: spike-snn-app
+  namespace: spike-snn-production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spike-snn-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: '8080'
+        prometheus.io/scrape: 'true'
+      labels:
+        app: spike-snn-app
+        version: v1.0.0
+    spec:
+      containers:
+      - env:
+        - name: SNN_ENVIRONMENT
+          value: production
+        - name: SNN_LOG_LEVEL
+          value: INFO
+        - name: SNN_WORKERS
+          valueFrom:
+            configMapKeyRef:
+              key: workers
+              name: spike-snn-config
+        image: spike-snn-event:v1.0.0
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        name: spike-snn-app
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /app/logs
+          name: logs
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      volumes:
+      - emptyDir: {}
+        name: tmp
+      - emptyDir: {}
+        name: logs

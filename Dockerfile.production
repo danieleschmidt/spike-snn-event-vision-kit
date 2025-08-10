@@ -1,0 +1,72 @@
+# Multi-stage Dockerfile for spike-snn-event-vision-kit
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+
+# Install system dependencies for building
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    cmake \
+    pkg-config \
+    libhdf5-dev \
+    libopencv-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Copy requirements first for better caching
+COPY requirements.txt pyproject.toml ./
+COPY src/ src/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Install the package
+RUN pip install --no-cache-dir --user -e .
+
+# Stage 2: Production runtime
+FROM python:3.11-slim as production
+
+# Create non-root user
+RUN groupadd -r snnuser && useradd -r -g snnuser snnuser
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libhdf5-103 \
+    libopencv-core4.5d \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy Python packages from builder
+COPY --from=builder /root/.local /home/snnuser/.local
+
+# Set up application directory
+WORKDIR /app
+RUN chown snnuser:snnuser /app
+
+# Copy application code
+COPY --chown=snnuser:snnuser src/ src/
+COPY --chown=snnuser:snnuser scripts/ scripts/
+COPY --chown=snnuser:snnuser examples/ examples/
+
+# Switch to non-root user
+USER snnuser
+
+# Set environment variables
+ENV PYTHONPATH="/app:/home/snnuser/.local/lib/python3.11/site-packages"
+ENV PATH="/home/snnuser/.local/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV SNN_ENVIRONMENT=production
+
+# Expose default port
+EXPOSE 8080
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python scripts/health_check.py
+
+# Default command
+CMD ["python", "-m", "spike_snn_event.cli", "serve", "--host", "0.0.0.0", "--port", "8080"]
