@@ -1,0 +1,675 @@
+# =====================================================================================
+# ISTIO SERVICE MESH - SYSTEM CONFIGURATION
+# =====================================================================================
+# Complete Istio service mesh setup for neuromorphic vision processing with
+# security policies, traffic management, and observability.
+# =====================================================================================
+
+---
+# Istio Operator for installation and management
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: neuromorphic-control-plane
+  namespace: istio-system
+spec:
+  # Istio version and components
+  revision: 1-19-0
+  
+  # Global configuration
+  values:
+    global:
+      meshID: neuromorphic-mesh
+      multiCluster:
+        clusterName: neuromorphic-primary
+      network: network1
+      
+      # Proxy configuration
+      proxy:
+        image: proxyv2:1.19.0
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 2000m
+            memory: 1Gi
+        
+        # Security settings
+        privileged: false
+        readinessInitialDelaySeconds: 1
+        readinessPeriodSeconds: 2
+        readinessFailureThreshold: 30
+        statusPort: 15020
+        
+        # Tracing configuration
+        tracer: jaeger
+      
+      # Logging configuration
+      logging:
+        level: "default:info"
+      
+      # Default resources
+      defaultResources:
+        requests:
+          cpu: 10m
+          memory: 40Mi
+  
+  # Component configuration
+  components:
+    # Pilot (Istiod)
+    pilot:
+      k8s:
+        env:
+          - name: PILOT_TRACE_SAMPLING
+            value: "1.0"
+          - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
+            value: "true"
+          - name: PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY
+            value: "true"
+          - name: PILOT_ENABLE_NETWORK_POLICIES
+            value: "true"
+          - name: EXTERNAL_ISTIOD
+            value: "false"
+        
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2048Mi
+          limits:
+            cpu: 2000m
+            memory: 4096Mi
+        
+        hpaSpec:
+          minReplicas: 2
+          maxReplicas: 10
+          scaleTargetRef:
+            apiVersion: apps/v1
+            kind: Deployment
+            name: istiod
+          metrics:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: Utilization
+                  averageUtilization: 80
+    
+    # Ingress Gateway
+    ingressGateways:
+      - name: istio-ingressgateway
+        enabled: true
+        k8s:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
+          
+          hpaSpec:
+            minReplicas: 2
+            maxReplicas: 10
+            scaleTargetRef:
+              apiVersion: apps/v1
+              kind: Deployment
+              name: istio-ingressgateway
+            metrics:
+              - type: Resource
+                resource:
+                  name: cpu
+                  target:
+                    type: Utilization
+                    averageUtilization: 80
+          
+          service:
+            type: LoadBalancer
+            annotations:
+              service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+              service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+              service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+              service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+            ports:
+              - port: 15021
+                targetPort: 15021
+                name: status-port
+              - port: 80
+                targetPort: 8080
+                name: http2
+              - port: 443
+                targetPort: 8443
+                name: https
+              - port: 15443
+                targetPort: 15443
+                name: tls
+    
+    # Egress Gateway
+    egressGateways:
+      - name: istio-egressgateway
+        enabled: true
+        k8s:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
+          
+          hpaSpec:
+            minReplicas: 1
+            maxReplicas: 5
+            scaleTargetRef:
+              apiVersion: apps/v1
+              kind: Deployment
+              name: istio-egressgateway
+            metrics:
+              - type: Resource
+                resource:
+                  name: cpu
+                  target:
+                    type: Utilization
+                    averageUtilization: 80
+  
+  # Mesh configuration
+  meshConfig:
+    # Tracing configuration
+    defaultConfig:
+      tracing:
+        sampling: 1.0
+        custom_tags:
+          cluster_name:
+            literal:
+              value: neuromorphic-primary
+          service_version:
+            header:
+              name: service-version
+    
+    # Access logging
+    accessLogFile: /dev/stdout
+    accessLogFormat: |
+      {
+        "timestamp": "%START_TIME%",
+        "method": "%REQ(:METHOD)%",
+        "path": "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%",
+        "protocol": "%PROTOCOL%",
+        "response_code": "%RESPONSE_CODE%",
+        "response_flags": "%RESPONSE_FLAGS%",
+        "bytes_received": "%BYTES_RECEIVED%",
+        "bytes_sent": "%BYTES_SENT%",
+        "duration": "%DURATION%",
+        "upstream_service_time": "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%",
+        "x_forwarded_for": "%REQ(X-FORWARDED-FOR)%",
+        "user_agent": "%REQ(USER-AGENT)%",
+        "request_id": "%REQ(X-REQUEST-ID)%",
+        "authority": "%REQ(:AUTHORITY)%",
+        "upstream_host": "%UPSTREAM_HOST%",
+        "downstream_remote_address": "%DOWNSTREAM_REMOTE_ADDRESS%"
+      }
+    
+    # Service discovery
+    defaultServiceExportTo:
+      - "."
+      - "istio-system"
+    
+    # TLS configuration
+    rootNamespace: istio-system
+    trustDomain: cluster.local
+    
+    # Extension providers
+    extensionProviders:
+      - name: jaeger
+        envoyOtelAls:
+          service: jaeger-collector.monitoring.svc.cluster.local
+          port: 4317
+      
+      - name: prometheus
+        prometheus:
+          configOverride:
+            metric_relabeling_configs:
+              - source_labels: [__name__]
+                regex: 'istio_.*'
+                action: keep
+      
+      - name: grafana
+        grafana:
+          service: grafana.monitoring.svc.cluster.local
+          port: 3000
+    
+    # Telemetry configuration
+    defaultProviders:
+      tracing:
+        - jaeger
+      metrics:
+        - prometheus
+    
+    # Trust configuration
+    caCertificates:
+      - pem: |
+          -----BEGIN CERTIFICATE-----
+          # CA Certificate will be mounted here
+          -----END CERTIFICATE-----
+        certSigners:
+          - cluster.local
+
+---
+# Namespace for neuromorphic vision application with Istio injection
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: neuromorphic-vision
+  labels:
+    istio-injection: enabled
+    name: neuromorphic-vision
+    security.istio.io/tlsMode: istio
+  annotations:
+    istio.io/rev: 1-19-0
+
+---
+# Gateway for external traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: neuromorphic-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    # HTTP (redirects to HTTPS)
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "neuromorphic.production.com"
+        - "api.neuromorphic.production.com"
+      tls:
+        httpsRedirect: true
+    
+    # HTTPS
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: neuromorphic-tls-cert
+      hosts:
+        - "neuromorphic.production.com"
+        - "api.neuromorphic.production.com"
+    
+    # mTLS for internal services
+    - port:
+        number: 15443
+        name: tls
+        protocol: TLS
+      tls:
+        mode: ISTIO_MUTUAL
+      hosts:
+        - "*.neuromorphic-vision.svc.cluster.local"
+
+---
+# Virtual Service for traffic routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: neuromorphic-vs
+  namespace: neuromorphic-vision
+spec:
+  hosts:
+    - "neuromorphic.production.com"
+    - "api.neuromorphic.production.com"
+    - neuromorphic-vision.neuromorphic-vision.svc.cluster.local
+  gateways:
+    - istio-system/neuromorphic-gateway
+    - mesh
+  http:
+    # API routes
+    - match:
+        - uri:
+            prefix: /api/v1/
+        - headers:
+            x-api-version:
+              exact: v1
+      route:
+        - destination:
+            host: neuromorphic-vision.neuromorphic-vision.svc.cluster.local
+            port:
+              number: 80
+            subset: v1
+          weight: 90
+        - destination:
+            host: neuromorphic-vision.neuromorphic-vision.svc.cluster.local
+            port:
+              number: 80
+            subset: v1-canary
+          weight: 10
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: gateway-error,connect-failure,refused-stream
+      fault:
+        delay:
+          percentage:
+            value: 0.1
+          fixedDelay: 5s
+    
+    # Health check routes
+    - match:
+        - uri:
+            prefix: /health
+        - uri:
+            prefix: /ready
+      route:
+        - destination:
+            host: neuromorphic-vision.neuromorphic-vision.svc.cluster.local
+            port:
+              number: 80
+      timeout: 5s
+    
+    # Metrics routes (internal only)
+    - match:
+        - uri:
+            prefix: /metrics
+        - headers:
+            x-forwarded-for:
+              regex: "^10\..*|^172\.(1[6-9]|2[0-9]|3[0-1])\..*|^192\.168\..*"
+      route:
+        - destination:
+            host: neuromorphic-vision.neuromorphic-vision.svc.cluster.local
+            port:
+              number: 9090
+    
+    # Default route
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: neuromorphic-vision.neuromorphic-vision.svc.cluster.local
+            port:
+              number: 80
+            subset: v1
+      timeout: 60s
+      headers:
+        request:
+          set:
+            x-request-start: "%START_TIME%"
+        response:
+          set:
+            x-response-time: "%DURATION%"
+
+---
+# Destination Rule for traffic policies
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: neuromorphic-dr
+  namespace: neuromorphic-vision
+spec:
+  host: neuromorphic-vision.neuromorphic-vision.svc.cluster.local
+  trafficPolicy:
+    # Connection pool settings
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        tcpNoDelay: true
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        idleTimeout: 60s
+        h2UpgradePolicy: UPGRADE
+    
+    # Load balancer settings
+    loadBalancer:
+      simple: LEAST_CONN
+      consistentHash:
+        httpHeaderName: "x-user-id"
+    
+    # Circuit breaker
+    outlierDetection:
+      consecutive5xxErrors: 5
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+    
+    # TLS settings
+    tls:
+      mode: ISTIO_MUTUAL
+  
+  # Service subsets
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 50
+    
+    - name: v1-canary
+      labels:
+        version: v1-canary
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 20
+
+---
+# Service Entry for external dependencies
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-models-api
+  namespace: neuromorphic-vision
+spec:
+  hosts:
+    - models.huggingface.co
+    - download.pytorch.org
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Authorization Policy for security
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: neuromorphic-authz
+  namespace: neuromorphic-vision
+spec:
+  selector:
+    matchLabels:
+      app: neuromorphic-vision
+  
+  rules:
+    # Allow health checks from anywhere
+    - to:
+        - operation:
+            paths: ["/health", "/ready"]
+    
+    # Allow metrics from monitoring namespace
+    - from:
+        - source:
+            namespaces: ["monitoring", "istio-system"]
+      to:
+        - operation:
+            paths: ["/metrics"]
+    
+    # Allow API access from ingress gateway
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+      to:
+        - operation:
+            paths: ["/api/*"]
+    
+    # Allow internal service-to-service communication
+    - from:
+        - source:
+            namespaces: ["neuromorphic-vision"]
+      to:
+        - operation:
+            methods: ["GET", "POST"]
+
+---
+# Peer Authentication for mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: neuromorphic-peer-auth
+  namespace: neuromorphic-vision
+spec:
+  selector:
+    matchLabels:
+      app: neuromorphic-vision
+  mtls:
+    mode: STRICT
+  
+  # Port-specific settings
+  portLevelMtls:
+    9090:  # Metrics port
+      mode: PERMISSIVE
+
+---
+# Request Authentication for JWT validation
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: neuromorphic-jwt
+  namespace: neuromorphic-vision
+spec:
+  selector:
+    matchLabels:
+      app: neuromorphic-vision
+  
+  jwtRules:
+    - issuer: "https://auth.neuromorphic.production.com"
+      jwksUri: "https://auth.neuromorphic.production.com/.well-known/jwks.json"
+      audiences:
+        - "neuromorphic-api"
+      forwardOriginalToken: true
+      fromHeaders:
+        - name: "Authorization"
+          prefix: "Bearer "
+      fromParams:
+        - "token"
+
+---
+# Telemetry configuration
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: neuromorphic-telemetry
+  namespace: neuromorphic-vision
+spec:
+  selector:
+    matchLabels:
+      app: neuromorphic-vision
+  
+  metrics:
+    - providers:
+        - name: prometheus
+      overrides:
+        - match:
+            metric: ALL_METRICS
+          tagOverrides:
+            service_name:
+              operation: UPSERT
+              value: "neuromorphic-vision"
+            service_version:
+              operation: UPSERT
+              value: "%{PILOT_PROXY_VERSION}"
+  
+  tracing:
+    - providers:
+        - name: jaeger
+      customTags:
+        cluster_name:
+          literal:
+            value: neuromorphic-primary
+        gpu_node:
+          header:
+            name: x-gpu-node
+            defaultValue: "unknown"
+  
+  accessLogging:
+    - providers:
+        - name: otel
+      filter:
+        expression: 'response.code >= 400'
+
+---
+# Envoy Filter for custom configurations
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: neuromorphic-custom-filter
+  namespace: neuromorphic-vision
+spec:
+  workloadSelector:
+    labels:
+      app: neuromorphic-vision
+  
+  configPatches:
+    # Add custom headers
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.local_ratelimit
+          typed_config:
+            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+            type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            value:
+              stat_prefix: local_rate_limiter
+              token_bucket:
+                max_tokens: 1000
+                tokens_per_fill: 100
+                fill_interval: 60s
+              filter_enabled:
+                runtime_key: local_rate_limit_enabled
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              filter_enforced:
+                runtime_key: local_rate_limit_enforced
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              response_headers_to_add:
+                - append: false
+                  header:
+                    key: x-local-rate-limit
+                    value: 'true'
+    
+    # GPU affinity headers
+    - applyTo: HTTP_ROUTE
+      match:
+        context: SIDECAR_INBOUND
+      patch:
+        operation: MERGE
+        value:
+          route:
+            request_headers_to_add:
+              - header:
+                  key: x-gpu-node
+                  value: "%{HOSTNAME}"
+                append: false

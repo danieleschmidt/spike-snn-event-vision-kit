@@ -29,6 +29,9 @@ except ImportError:
 from .monitoring import get_metrics_collector
 from .concurrency import get_concurrent_processor, ConcurrentProcessor
 from .validation import ValidationError
+from .intelligent_cache_system import get_intelligent_cache
+from .gpu_distributed_processor import get_distributed_gpu_processor
+from .async_event_processor import get_async_event_pipeline
 
 
 @dataclass
@@ -43,6 +46,34 @@ class ResourceMetrics:
     inference_queue_size: int = 0
     average_inference_time: float = 0.0
     error_rate: float = 0.0
+    event_throughput_eps: float = 0.0
+    cache_hit_rate: float = 0.0
+    pipeline_latency_ns: float = 0.0
+    gpu_memory_fragmentation: float = 0.0
+    timestamp: float = field(default_factory=time.time)
+    
+
+@dataclass
+class WorkloadPrediction:
+    """Workload prediction for proactive scaling."""
+    predicted_cpu_percent: float = 0.0
+    predicted_memory_percent: float = 0.0
+    predicted_throughput_eps: float = 0.0
+    predicted_latency_ms: float = 0.0
+    confidence_score: float = 0.0
+    prediction_horizon_seconds: float = 300.0
+    prediction_timestamp: float = field(default_factory=time.time)
+    
+
+@dataclass
+class ScalingDecision:
+    """Intelligent scaling decision with reasoning."""
+    action: str  # 'scale_up', 'scale_down', 'no_action'
+    target_workers: int
+    confidence: float
+    reasoning: List[str]
+    expected_improvement: Dict[str, float]
+    risk_assessment: Dict[str, float]
     timestamp: float = field(default_factory=time.time)
 
 

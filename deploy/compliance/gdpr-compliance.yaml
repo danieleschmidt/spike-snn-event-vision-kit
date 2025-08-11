@@ -1,0 +1,805 @@
+# =====================================================================================
+# GDPR COMPLIANCE CONFIGURATION
+# =====================================================================================
+# Comprehensive GDPR compliance implementation for neuromorphic vision processing
+# including data protection, privacy controls, and regulatory compliance measures.
+# =====================================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gdpr-compliance-config
+  namespace: neuromorphic-vision
+  labels:
+    compliance: gdpr
+    regulation: eu-data-protection
+data:
+  gdpr-config.yaml: |
+    # GDPR Compliance Configuration
+    gdpr:
+      # Article 25 - Data Protection by Design and by Default
+      data_protection_by_design:
+        enabled: true
+        
+        # Pseudonymization (Article 4(5))
+        pseudonymization:
+          enabled: true
+          algorithm: "AES-256-GCM"
+          key_rotation_interval: 90d
+          
+          # Pseudonymization for different data types
+          data_types:
+            user_identifiers:
+              method: "deterministic"
+              salt_size: 32
+            session_data:
+              method: "random"
+              salt_size: 16
+            inference_metadata:
+              method: "format_preserving"
+              salt_size: 24
+        
+        # Anonymization (Article 4(1))
+        anonymization:
+          enabled: true
+          techniques:
+            - k_anonymity:
+                k_value: 5
+                sensitive_attributes: ["user_id", "ip_address", "session_id"]
+            - l_diversity:
+                l_value: 3
+                sensitive_attributes: ["inference_type", "model_version"]
+            - differential_privacy:
+                epsilon: 1.0
+                delta: 0.00001
+                mechanism: "gaussian"
+        
+        # Data minimization (Article 5(1)(c))
+        data_minimization:
+          enabled: true
+          
+          # Automatic data reduction
+          automatic_reduction:
+            enabled: true
+            retention_policies:
+              - data_type: "inference_logs"
+                retention_period: 30d
+                reduction_method: "aggregation"
+              - data_type: "user_interactions"
+                retention_period: 90d
+                reduction_method: "sampling"
+              - data_type: "performance_metrics"
+                retention_period: 365d
+                reduction_method: "statistical_summary"
+          
+          # Data collection limitations
+          collection_limits:
+            - category: "personal_data"
+              max_fields: 10
+              required_justification: true
+            - category: "technical_data"
+              max_fields: 50
+              required_justification: false
+      
+      # Article 12-14 - Transparent Information and Communication
+      transparency:
+        enabled: true
+        
+        # Privacy notices
+        privacy_notices:
+          auto_generate: true
+          languages: ["en", "de", "fr", "es", "it"]
+          
+          # Data processing purposes
+          processing_purposes:
+            - purpose: "neuromorphic_inference"
+              legal_basis: "legitimate_interest"
+              description: "AI model inference processing"
+              data_types: ["inference_data", "model_metadata"]
+              retention_period: "30d"
+              automated_decision_making: true
+            
+            - purpose: "service_improvement"
+              legal_basis: "legitimate_interest"
+              description: "Model performance optimization"
+              data_types: ["performance_metrics", "error_logs"]
+              retention_period: "1y"
+              automated_decision_making: false
+            
+            - purpose: "security_monitoring"
+              legal_basis: "legitimate_interest"
+              description: "System security and fraud prevention"
+              data_types: ["access_logs", "security_events"]
+              retention_period: "2y"
+              automated_decision_making: true
+        
+        # Data subject information
+        data_subject_info:
+          controller_identity:
+            name: "Neuromorphic Vision Inc."
+            address: "123 AI Street, Tech City, TC 12345"
+            email: "dpo@neuromorphic.production.com"
+            phone: "+1-555-0123"
+          
+          data_protection_officer:
+            name: "Dr. Jane Smith"
+            email: "dpo@neuromorphic.production.com"
+            phone: "+1-555-0124"
+      
+      # Article 15-22 - Data Subject Rights
+      data_subject_rights:
+        enabled: true
+        
+        # Right of access (Article 15)
+        right_of_access:
+          enabled: true
+          response_time: 30d
+          
+          # Data portability format
+          export_formats:
+            - json
+            - csv
+            - xml
+          
+          # Automated processing for access requests
+          automated_processing:
+            enabled: true
+            verification_required: true
+            identity_verification:
+              method: "two_factor"
+              documents_required: ["government_id"]
+        
+        # Right to rectification (Article 16)
+        right_to_rectification:
+          enabled: true
+          response_time: 30d
+          
+          # Data validation rules
+          validation_rules:
+            - field: "email"
+              validation: "email_format"
+            - field: "phone"
+              validation: "phone_format"
+            - field: "preferences"
+              validation: "enum_values"
+        
+        # Right to erasure (Article 17)
+        right_to_erasure:
+          enabled: true
+          response_time: 30d
+          
+          # Automatic erasure triggers
+          automatic_erasure:
+            - trigger: "data_retention_expired"
+              action: "hard_delete"
+            - trigger: "consent_withdrawn"
+              action: "soft_delete_with_recovery_period"
+              recovery_period: 30d
+            - trigger: "account_deleted"
+              action: "immediate_anonymization"
+          
+          # Third-party notification for erasure
+          third_party_notification:
+            enabled: true
+            notify_processors: true
+            notification_timeout: 48h
+        
+        # Right to restrict processing (Article 18)
+        right_to_restrict:
+          enabled: true
+          response_time: 30d
+          
+          # Processing restriction methods
+          restriction_methods:
+            - method: "quarantine"
+              description: "Move data to restricted access storage"
+            - method: "flag_marking"
+              description: "Mark data as restricted in database"
+            - method: "temporary_removal"
+              description: "Temporarily remove from processing systems"
+        
+        # Right to data portability (Article 20)
+        right_to_portability:
+          enabled: true
+          response_time: 30d
+          
+          # Supported formats
+          export_formats:
+            structured_data: ["json", "csv", "xml"]
+            machine_readable: ["json", "parquet"]
+            human_readable: ["pdf", "html"]
+          
+          # Direct transmission to other controllers
+          direct_transmission:
+            enabled: true
+            supported_protocols: ["sftp", "https_api", "email_encrypted"]
+        
+        # Right to object (Article 21)
+        right_to_object:
+          enabled: true
+          response_time: 30d
+          
+          # Objection handling
+          objection_handling:
+            - processing_type: "direct_marketing"
+              action: "immediate_cessation"
+            - processing_type: "legitimate_interest"
+              action: "assessment_required"
+              assessment_criteria: ["compelling_grounds", "legal_claims"]
+            - processing_type: "scientific_research"
+              action: "conditional_cessation"
+              conditions: ["no_public_interest_research"]
+        
+        # Rights related to automated decision making (Article 22)
+        automated_decision_making:
+          enabled: true
+          
+          # Human intervention rights
+          human_intervention:
+            enabled: true
+            request_method: "web_form"
+            response_time: 72h
+          
+          # Explanation rights
+          explanation_rights:
+            enabled: true
+            explanation_depth: "detailed"
+            include_model_details: false
+            include_decision_factors: true
+      
+      # Article 32 - Security of Processing
+      security_measures:
+        enabled: true
+        
+        # Encryption requirements
+        encryption:
+          at_rest:
+            enabled: true
+            algorithm: "AES-256-GCM"
+            key_management: "hsm"
+          
+          in_transit:
+            enabled: true
+            protocol: "TLS-1.3"
+            certificate_validation: "strict"
+          
+          in_processing:
+            enabled: true
+            method: "homomorphic_encryption"
+            performance_impact: "acceptable"
+        
+        # Access controls
+        access_controls:
+          authentication:
+            method: "multi_factor"
+            factors: ["password", "totp", "hardware_key"]
+            session_timeout: 4h
+          
+          authorization:
+            model: "rbac"
+            principle: "least_privilege"
+            regular_review: 90d
+          
+          audit_logging:
+            enabled: true
+            log_level: "detailed"
+            retention_period: 7y
+            tamper_protection: true
+        
+        # Data breach procedures
+        breach_procedures:
+          detection:
+            automated_monitoring: true
+            alert_threshold: "low"
+            escalation_matrix:
+              - severity: "low"
+                notification_time: 24h
+                recipients: ["security_team"]
+              - severity: "medium"
+                notification_time: 4h
+                recipients: ["security_team", "dpo"]
+              - severity: "high"
+                notification_time: 1h
+                recipients: ["security_team", "dpo", "management"]
+              - severity: "critical"
+                notification_time: 15m
+                recipients: ["all_stakeholders", "external_counsel"]
+          
+          notification:
+            supervisory_authority:
+              enabled: true
+              deadline: 72h
+              contact_details:
+                authority: "Data Protection Commission"
+                email: "info@dataprotection.ie"
+                portal: "https://forms.dataprotection.ie"
+            
+            data_subjects:
+              enabled: true
+              conditions: ["high_risk_to_rights"]
+              deadline: 72h
+              communication_methods: ["email", "in_app_notification", "postal_mail"]
+      
+      # Article 35 - Data Protection Impact Assessment (DPIA)
+      dpia:
+        enabled: true
+        
+        # DPIA triggers
+        triggers:
+          - "large_scale_processing"
+          - "automated_decision_making"
+          - "sensitive_data_processing"
+          - "systematic_monitoring"
+          - "biometric_data_processing"
+        
+        # DPIA process
+        process:
+          stakeholders:
+            - "data_protection_officer"
+            - "system_architect"
+            - "security_officer"
+            - "legal_counsel"
+          
+          assessment_criteria:
+            - "necessity_and_proportionality"
+            - "risk_to_data_subjects"
+            - "safeguards_adequacy"
+            - "compliance_measures"
+          
+          documentation_requirements:
+            - "processing_description"
+            - "legitimate_interests_assessment"
+            - "risk_analysis"
+            - "mitigation_measures"
+            - "consultation_outcomes"
+        
+        # Risk assessment framework
+        risk_assessment:
+          likelihood_scale: ["remote", "possible", "probable", "certain"]
+          severity_scale: ["negligible", "limited", "significant", "maximum"]
+          
+          risk_factors:
+            - "data_volume"
+            - "data_sensitivity"
+            - "processing_purpose"
+            - "technology_maturity"
+            - "organizational_measures"
+      
+      # Article 37 - Data Protection Officer (DPO)
+      dpo:
+        mandatory: true
+        
+        contact_details:
+          name: "Dr. Jane Smith"
+          title: "Chief Data Protection Officer"
+          email: "dpo@neuromorphic.production.com"
+          phone: "+1-555-0124"
+          address: "123 AI Street, Tech City, TC 12345"
+        
+        responsibilities:
+          - "monitoring_compliance"
+          - "conducting_dpia"
+          - "training_staff"
+          - "cooperation_with_authorities"
+          - "data_subject_consultation"
+        
+        independence:
+          reporting_line: "ceo"
+          no_instructions: true
+          no_dismissal_without_cause: true
+          adequate_resources: true
+      
+      # Article 44-49 - International Data Transfers
+      international_transfers:
+        enabled: true
+        
+        # Transfer mechanisms
+        adequacy_decisions:
+          enabled: true
+          approved_countries:
+            - "canada"
+            - "japan"
+            - "south_korea"
+            - "new_zealand"
+            - "argentina"
+            - "uruguay"
+        
+        standard_contractual_clauses:
+          enabled: true
+          version: "2021"
+          
+          # Additional safeguards
+          additional_safeguards:
+            - "encryption_in_transit"
+            - "encryption_at_rest"
+            - "access_controls"
+            - "audit_logging"
+            - "data_localization_options"
+        
+        binding_corporate_rules:
+          enabled: false  # Not applicable for single entity
+        
+        # Transfer impact assessment
+        transfer_impact_assessment:
+          required: true
+          
+          assessment_factors:
+            - "destination_country_laws"
+            - "data_subject_rights"
+            - "redress_mechanisms"
+            - "government_access_laws"
+            - "surveillance_practices"
+          
+          documentation:
+            - "legal_analysis"
+            - "risk_assessment"
+            - "safeguard_effectiveness"
+            - "monitoring_measures"
+      
+      # Compliance monitoring and auditing
+      monitoring:
+        enabled: true
+        
+        # Regular assessments
+        assessments:
+          compliance_audit:
+            frequency: "annual"
+            external_auditor: true
+            scope: "full_gdpr_compliance"
+          
+          risk_assessment:
+            frequency: "quarterly"
+            automated_scanning: true
+            manual_review: true
+          
+          data_mapping:
+            frequency: "bi-annual"
+            automated_discovery: true
+            classification_review: true
+        
+        # Metrics and KPIs
+        metrics:
+          - name: "data_subject_request_response_time"
+            target: "<30d"
+            measurement: "average"
+          
+          - name: "data_breach_notification_time"
+            target: "<72h"
+            measurement: "maximum"
+          
+          - name: "privacy_training_completion"
+            target: ">95%"
+            measurement: "percentage"
+          
+          - name: "dpia_completion_rate"
+            target: "100%"
+            measurement: "percentage"
+        
+        # Reporting
+        reporting:
+          internal:
+            frequency: "monthly"
+            recipients: ["dpo", "management", "legal_team"]
+            format: "dashboard"
+          
+          external:
+            supervisory_authority:
+              frequency: "annual"
+              format: "formal_report"
+            
+            data_subjects:
+              transparency_report:
+                frequency: "annual"
+                publication: "public_website"
+      
+      # Training and awareness
+      training:
+        enabled: true
+        
+        # Staff training programs
+        programs:
+          - name: "gdpr_fundamentals"
+            target_audience: "all_staff"
+            frequency: "annual"
+            duration: "2h"
+            certification_required: true
+          
+          - name: "data_handling_procedures"
+            target_audience: "data_processors"
+            frequency: "bi-annual"
+            duration: "4h"
+            certification_required: true
+          
+          - name: "breach_response"
+            target_audience: "security_team"
+            frequency: "quarterly"
+            duration: "1h"
+            certification_required: true
+          
+          - name: "privacy_by_design"
+            target_audience: "developers"
+            frequency: "bi-annual"
+            duration: "3h"
+            certification_required: true
+        
+        # Training tracking
+        tracking:
+          completion_monitoring: true
+          certificate_management: true
+          refresher_notifications: true
+          compliance_reporting: true
+
+---
+# GDPR Data Subject Rights Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gdpr-rights-service
+  namespace: neuromorphic-vision
+  labels:
+    app: gdpr-rights-service
+    component: compliance
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: gdpr-rights-service
+  template:
+    metadata:
+      labels:
+        app: gdpr-rights-service
+        component: compliance
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: gdpr-rights-service
+      containers:
+      - name: rights-service
+        image: neuromorphic/gdpr-rights-service:v1.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: gdpr-database-credentials
+              key: url
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: gdpr-encryption-keys
+              key: data-encryption-key
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: gdpr-auth-secrets
+              key: jwt-secret
+        - name: DPO_EMAIL
+          value: "dpo@neuromorphic.production.com"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: templates
+          mountPath: /etc/templates
+          readOnly: true
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: gdpr-compliance-config
+      - name: templates
+        configMap:
+          name: gdpr-email-templates
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+---
+# GDPR Rights Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gdpr-rights-service
+  namespace: neuromorphic-vision
+  labels:
+    app: gdpr-rights-service
+
+---
+# GDPR Rights Service RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gdpr-rights-service
+  namespace: neuromorphic-vision
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gdpr-rights-service
+  namespace: neuromorphic-vision
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gdpr-rights-service
+subjects:
+- kind: ServiceAccount
+  name: gdpr-rights-service
+  namespace: neuromorphic-vision
+
+---
+# GDPR Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: gdpr-rights-service
+  namespace: neuromorphic-vision
+  labels:
+    app: gdpr-rights-service
+    component: compliance
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    name: http
+  - port: 9090
+    targetPort: 9090
+    name: metrics
+  selector:
+    app: gdpr-rights-service
+
+---
+# GDPR Email Templates
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gdpr-email-templates
+  namespace: neuromorphic-vision
+  labels:
+    component: gdpr-compliance
+data:
+  access-request-confirmation.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Data Access Request Confirmation</title>
+    </head>
+    <body>
+        <h1>Data Access Request Received</h1>
+        <p>Dear {{.DataSubject.Name}},</p>
+        <p>We have received your request to access your personal data under Article 15 of the GDPR.</p>
+        <p><strong>Request ID:</strong> {{.Request.ID}}</p>
+        <p><strong>Submitted:</strong> {{.Request.SubmittedAt}}</p>
+        <p>We will process your request within 30 days and provide you with the requested information.</p>
+        <p>If you have any questions, please contact our Data Protection Officer at dpo@neuromorphic.production.com</p>
+        <p>Best regards,<br>Neuromorphic Vision Data Protection Team</p>
+    </body>
+    </html>
+  
+  erasure-request-confirmation.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Data Erasure Request Confirmation</title>
+    </head>
+    <body>
+        <h1>Data Erasure Request Received</h1>
+        <p>Dear {{.DataSubject.Name}},</p>
+        <p>We have received your request to erase your personal data under Article 17 of the GDPR.</p>
+        <p><strong>Request ID:</strong> {{.Request.ID}}</p>
+        <p><strong>Submitted:</strong> {{.Request.SubmittedAt}}</p>
+        <p>We will process your request within 30 days. Please note that some data may be retained for legal compliance purposes.</p>
+        <p>If you have any questions, please contact our Data Protection Officer at dpo@neuromorphic.production.com</p>
+        <p>Best regards,<br>Neuromorphic Vision Data Protection Team</p>
+    </body>
+    </html>
+  
+  rectification-request-confirmation.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Data Rectification Request Confirmation</title>
+    </head>
+    <body>
+        <h1>Data Rectification Request Received</h1>
+        <p>Dear {{.DataSubject.Name}},</p>
+        <p>We have received your request to rectify your personal data under Article 16 of the GDPR.</p>
+        <p><strong>Request ID:</strong> {{.Request.ID}}</p>
+        <p><strong>Submitted:</strong> {{.Request.SubmittedAt}}</p>
+        <p><strong>Data to be corrected:</strong> {{.Request.DataFields}}</p>
+        <p>We will process your request within 30 days and confirm when the corrections have been made.</p>
+        <p>If you have any questions, please contact our Data Protection Officer at dpo@neuromorphic.production.com</p>
+        <p>Best regards,<br>Neuromorphic Vision Data Protection Team</p>
+    </body>
+    </html>
+
+---
+# Network Policy for GDPR Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gdpr-rights-service-netpol
+  namespace: neuromorphic-vision
+spec:
+  podSelector:
+    matchLabels:
+      app: gdpr-rights-service
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow ingress from neuromorphic vision app
+  - from:
+    - podSelector:
+        matchLabels:
+          app: neuromorphic-vision
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow monitoring access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  
+  egress:
+  # Allow database access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Allow HTTPS for external API calls
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443

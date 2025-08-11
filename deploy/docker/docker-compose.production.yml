@@ -1,0 +1,556 @@
+# =====================================================================================
+# PRODUCTION DOCKER COMPOSE - NEUROMORPHIC VISION PROCESSING STACK
+# =====================================================================================
+# Complete production-ready stack with monitoring, logging, and security
+# =====================================================================================
+
+version: '3.8'
+
+# =====================================================================================
+# NETWORKS - Isolated network segments for security
+# =====================================================================================
+networks:
+  neuromorphic-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: neuromorphic0
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+  monitoring-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: monitoring0
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+  storage-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: storage0
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1
+
+# =====================================================================================
+# VOLUMES - Persistent storage for data, models, and logs
+# =====================================================================================
+volumes:
+  # Application data
+  neuromorphic-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}
+  neuromorphic-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${MODELS_PATH:-./models}
+  neuromorphic-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOGS_PATH:-./logs}
+  
+  # Monitoring data
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  alertmanager-data:
+    driver: local
+  
+  # Database data
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  
+  # Shared temporary storage
+  shared-tmp:
+    driver: local
+
+# =====================================================================================
+# SERVICES - Complete production stack
+# =====================================================================================
+services:
+  # ====================================================================================
+  # CORE APPLICATION SERVICES
+  # ====================================================================================
+  
+  # Main neuromorphic vision processing service
+  neuromorphic-vision:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.production
+      target: runtime
+      args:
+        BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        VCS_REF: ${VCS_REF:-$(git rev-parse HEAD)}
+        VERSION: ${VERSION:-latest}
+    image: neuromorphic-vision:${VERSION:-latest}
+    container_name: neuromorphic-vision-main
+    hostname: neuromorphic-vision
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    
+    environment:
+      # Application configuration
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEBUG: "false"
+      
+      # Database connections
+      DATABASE_URL: postgresql://neuromorphic:${DB_PASSWORD:-neuromorphic_pass}@postgres:5432/neuromorphic
+      REDIS_URL: redis://redis:6379/0
+      
+      # Model storage
+      MODEL_STORAGE_PATH: /app/models
+      DATA_STORAGE_PATH: /app/data
+      
+      # Monitoring
+      PROMETHEUS_METRICS_PORT: 9090
+      HEALTH_CHECK_PORT: 8081
+      
+      # Security
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-in-production}
+      
+      # CUDA configuration
+      CUDA_VISIBLE_DEVICES: all
+      NVIDIA_VISIBLE_DEVICES: all
+    
+    ports:
+      - "8000:8000"  # Main API
+      - "9090:9090"  # Metrics
+      - "8081:8081"  # Health check
+    
+    volumes:
+      - neuromorphic-data:/app/data:rw
+      - neuromorphic-models:/app/models:rw
+      - neuromorphic-logs:/app/logs:rw
+      - shared-tmp:/tmp:rw
+    
+    networks:
+      - neuromorphic-network
+      - monitoring-network
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "python3", "/app/scripts/health_check.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.neuromorphic.rule=Host(`neuromorphic.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.neuromorphic.loadbalancer.server.port=8000"
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9090"
+      - "prometheus.io/path=/metrics"
+
+  # Load balancer and reverse proxy
+  traefik:
+    image: traefik:v3.0
+    container_name: neuromorphic-traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=true
+      - --api.debug=${DEBUG:-false}
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --metrics.prometheus=true
+      - --metrics.prometheus.addentrypointslabels=true
+      - --metrics.prometheus.addserviceslabels=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt:rw
+    networks:
+      - neuromorphic-network
+      - monitoring-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+  # ====================================================================================
+  # DATABASE SERVICES
+  # ====================================================================================
+  
+  # PostgreSQL database for application data
+  postgres:
+    image: postgres:15-alpine
+    container_name: neuromorphic-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: neuromorphic
+      POSTGRES_USER: neuromorphic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-neuromorphic_pass}
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8 --locale=C
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:rw
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    networks:
+      - storage-network
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neuromorphic -d neuromorphic"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: neuromorphic-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_pass}
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis-data:/data:rw
+    networks:
+      - storage-network
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # ====================================================================================
+  # MONITORING SERVICES
+  # ====================================================================================
+  
+  # Prometheus monitoring server
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: neuromorphic-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/alert-rules.yml:/etc/prometheus/rules/alert-rules.yml:ro
+      - prometheus-data:/prometheus:rw
+    networks:
+      - monitoring-network
+    ports:
+      - "9091:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  # Grafana dashboard server
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: neuromorphic-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel
+      GF_SERVER_DOMAIN: grafana.${DOMAIN:-localhost}
+      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:-localhost}
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: postgres:5432
+      GF_DATABASE_NAME: grafana
+      GF_DATABASE_USER: grafana
+      GF_DATABASE_PASSWORD: ${GRAFANA_DB_PASSWORD:-grafana_pass}
+    volumes:
+      - grafana-data:/var/lib/grafana:rw
+      - ../monitoring/grafana:/etc/grafana/provisioning:ro
+    networks:
+      - monitoring-network
+      - storage-network
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  # AlertManager for alert handling
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: neuromorphic-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://alertmanager.${DOMAIN:-localhost}'
+    volumes:
+      - ../monitoring/alertmanager.yml:/etc/alertmanager/config.yml:ro
+      - alertmanager-data:/alertmanager:rw
+    networks:
+      - monitoring-network
+    ports:
+      - "9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+
+  # Node Exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: neuromorphic-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)'
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - monitoring-network
+    ports:
+      - "9100:9100"
+    pid: host
+    deploy:
+      mode: global
+
+  # cAdvisor for container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: neuromorphic-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      - monitoring-network
+    ports:
+      - "8082:8080"
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # ====================================================================================
+  # LOGGING SERVICES
+  # ====================================================================================
+  
+  # Elasticsearch for log storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    container_name: neuromorphic-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.monitoring.collection.enabled=true
+    volumes:
+      - ./elasticsearch-data:/usr/share/elasticsearch/data:rw
+    networks:
+      - monitoring-network
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # Kibana for log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.9.0
+    container_name: neuromorphic-kibana
+    restart: unless-stopped
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_HOST: 0.0.0.0
+    networks:
+      - monitoring-network
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kibana.rule=Host(`kibana.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.kibana.loadbalancer.server.port=5601"
+
+  # ====================================================================================
+  # UTILITY SERVICES
+  # ====================================================================================
+  
+  # MinIO for S3-compatible object storage
+  minio:
+    image: minio/minio:RELEASE.2023-09-04T19-57-37Z
+    container_name: neuromorphic-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    volumes:
+      - ./minio-data:/data:rw
+    networks:
+      - storage-network
+      - monitoring-network
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio-api.rule=Host(`minio.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      - "traefik.http.routers.minio-console.rule=Host(`minio-console.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.48
+    container_name: neuromorphic-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+      SPAN_STORAGE_TYPE: elasticsearch
+      ES_SERVER_URLS: http://elasticsearch:9200
+    networks:
+      - monitoring-network
+    ports:
+      - "14268:14268"  # Jaeger collector
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:16686/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jaeger.rule=Host(`jaeger.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.jaeger.loadbalancer.server.port=16686"
+
+# =====================================================================================
+# CONFIGURATION OVERRIDES
+# =====================================================================================
+# Additional configurations can be specified via:
+# - .env file for environment variables
+# - docker-compose.override.yml for local development overrides
+# - docker-compose.prod.yml for production-specific overrides

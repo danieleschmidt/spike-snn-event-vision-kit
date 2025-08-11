@@ -1,118 +1,175 @@
-# Terraform configuration for Spike SNN Event Vision Kit infrastructure
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.23"
-    }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.11"
-    }
-  }
+# =====================================================================================
+# SPIKE SNN EVENT VISION KIT - PRODUCTION DEPLOYMENT INFRASTRUCTURE
+# =====================================================================================
+# Comprehensive multi-cloud, multi-region production deployment for neuromorphic
+# vision processing with enterprise-grade security, monitoring, and compliance.
+# =====================================================================================
+
+# =====================================================================================
+# SECURITY - KMS KEYS FOR ENCRYPTION
+# =====================================================================================
+
+resource "aws_kms_key" "eks" {
+  count = var.enable_encryption_at_rest ? 1 : 0
+  
+  description             = "EKS Secret Encryption Key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-eks-key"
+  })
 }
 
-# Variables
-variable "cluster_name" {
-  description = "Name of the EKS cluster"
-  type        = string
-  default     = "spike-snn-cluster"
+resource "aws_kms_alias" "eks" {
+  count = var.enable_encryption_at_rest ? 1 : 0
+  
+  name          = "alias/${local.name_prefix}-eks"
+  target_key_id = aws_kms_key.eks[0].key_id
 }
 
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-west-2"
+resource "aws_kms_key" "ebs" {
+  count = var.enable_encryption_at_rest ? 1 : 0
+  
+  description             = "EBS Volume Encryption Key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ebs-key"
+  })
 }
 
-variable "node_instance_types" {
-  description = "Instance types for worker nodes"
-  type        = list(string)
-  default     = ["g4dn.xlarge", "g4dn.2xlarge"]
+resource "aws_kms_alias" "ebs" {
+  count = var.enable_encryption_at_rest ? 1 : 0
+  
+  name          = "alias/${local.name_prefix}-ebs"
+  target_key_id = aws_kms_key.ebs[0].key_id
 }
 
-variable "min_size" {
-  description = "Minimum number of worker nodes"
-  type        = number
-  default     = 2
-}
+# =====================================================================================
+# NETWORKING - VPC AND SUBNETS
+# =====================================================================================
 
-variable "max_size" {
-  description = "Maximum number of worker nodes"
-  type        = number
-  default     = 20
-}
-
-variable "desired_size" {
-  description = "Desired number of worker nodes"
-  type        = number
-  default     = 3
-}
-
-# Configure providers
-provider "aws" {
-  region = var.region
-}
-
-# Data sources
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-data "aws_caller_identity" "current" {}
-
-# VPC
 module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
 
-  name = "${var.cluster_name}-vpc"
-  cidr = "10.0.0.0/16"
+  name = "${local.name_prefix}-vpc"
+  cidr = var.vpc_cidr
 
-  azs             = slice(data.aws_availability_zones.available.names, 0, 3)
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  azs             = local.azs
+  private_subnets = local.private_subnets
+  public_subnets  = local.public_subnets
 
-  enable_nat_gateway = true
-  enable_vpn_gateway = false
+  # NAT Gateway configuration
+  enable_nat_gateway     = true
+  single_nat_gateway     = var.environment == "dev" ? true : false
+  one_nat_gateway_per_az = var.environment == "prod" ? true : false
+  
+  # DNS configuration
   enable_dns_hostnames = true
-  enable_dns_support = true
+  enable_dns_support   = true
+  
+  # VPC Flow Logs
+  enable_flow_log                      = true
+  create_flow_log_cloudwatch_iam_role  = true
+  create_flow_log_cloudwatch_log_group = true
+  flow_log_max_aggregation_interval    = 60
+  
+  # VPC Endpoints for security and cost optimization
+  enable_s3_endpoint       = true
+  enable_dynamodb_endpoint = true
+  
+  tags = merge(local.common_tags, local.cluster_labels)
 
-  tags = {
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    Environment = "production"
-    Project     = "spike-snn-event"
-  }
+  public_subnet_tags = merge(local.cluster_labels, {
+    "kubernetes.io/role/elb" = "1"
+    "subnet-type"            = "public"
+  })
 
-  public_subnet_tags = {
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    "kubernetes.io/role/elb"                    = "1"
-  }
+  private_subnet_tags = merge(local.cluster_labels, {
+    "kubernetes.io/role/internal-elb" = "1"
+    "subnet-type"                     = "private"
+  })
 
-  private_subnet_tags = {
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    "kubernetes.io/role/internal-elb"           = "1"
-  }
+  # Additional VPC endpoints for private connectivity
+  vpc_endpoint_tags = local.common_tags
 }
 
-# EKS Cluster
+# =====================================================================================
+# EKS CLUSTER - KUBERNETES CONTROL PLANE
+# =====================================================================================
+
 module "eks" {
-  source = "terraform-aws-modules/eks/aws"
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 19.0"
 
-  cluster_name    = var.cluster_name
-  cluster_version = "1.28"
+  cluster_name    = local.cluster_name
+  cluster_version = local.cluster_version
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id                         = module.vpc.vpc_id
+  subnet_ids                     = module.vpc.private_subnets
+  control_plane_subnet_ids       = module.vpc.private_subnets
 
-  cluster_endpoint_public_access = true
+  # Cluster endpoint configuration
+  cluster_endpoint_public_access  = var.environment == "prod" ? false : true
   cluster_endpoint_private_access = true
+  cluster_endpoint_public_access_cidrs = var.environment == "prod" ? [] : ["0.0.0.0/0"]
 
-  # Cluster security group
+  # Security and encryption
+  cluster_encryption_config = var.enable_encryption_at_rest ? [
+    {
+      provider_key_arn = aws_kms_key.eks[0].arn
+      resources        = ["secrets"]
+    }
+  ] : []
+  
+  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+  cloudwatch_log_group_retention_in_days = var.log_retention_days
+  
+  # IRSA (IAM Roles for Service Accounts)
+  enable_irsa = true
+  
+  # Cluster add-ons
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+      configuration_values = jsonencode({
+        computeType = "Fargate"
+        resources = {
+          limits = {
+            cpu    = "100m"
+            memory = "128Mi"
+          }
+          requests = {
+            cpu    = "100m"
+            memory = "128Mi"
+          }
+        }
+      })
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent    = true
+      before_compute = true
+      configuration_values = jsonencode({
+        env = {
+          ENABLE_PREFIX_DELEGATION = "true"
+          ENABLE_POD_ENI           = "true"
+          POD_SECURITY_GROUP_ENFORCING_MODE = "standard"
+        }
+      })
+    }
+    aws-ebs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = module.ebs_csi_irsa_role.iam_role_arn
+    }
+  }
+
+  # Enhanced cluster security group rules
   cluster_security_group_additional_rules = {
     ingress_nodes_ephemeral_ports_tcp = {
       description                = "Node groups to cluster API"
@@ -122,9 +179,17 @@ module "eks" {
       type                       = "ingress"
       source_node_security_group = true
     }
+    ingress_nodes_https = {
+      description                = "Nodes to cluster HTTPS"
+      protocol                   = "tcp"
+      from_port                  = 443
+      to_port                    = 443
+      type                       = "ingress"
+      source_node_security_group = true
+    }
   }
 
-  # Node security group
+  # Enhanced node security group rules
   node_security_group_additional_rules = {
     ingress_self_all = {
       description = "Node to node all ports/protocols"
@@ -142,33 +207,84 @@ module "eks" {
       type                          = "ingress"
       source_cluster_security_group = true
     }
+    # Allow ingress from ALB
+    ingress_alb_http = {
+      description = "ALB to nodes HTTP"
+      protocol    = "tcp"
+      from_port   = 80
+      to_port     = 80
+      type        = "ingress"
+      cidr_blocks = [var.vpc_cidr]
+    }
+    ingress_alb_https = {
+      description = "ALB to nodes HTTPS"
+      protocol    = "tcp"
+      from_port   = 443
+      to_port     = 443
+      type        = "ingress"
+      cidr_blocks = [var.vpc_cidr]
+    }
+    # Prometheus and Grafana
+    ingress_monitoring = {
+      description = "Monitoring access"
+      protocol    = "tcp"
+      from_port   = 9090
+      to_port     = 9100
+      type        = "ingress"
+      cidr_blocks = [var.vpc_cidr]
+    }
   }
 
-  # EKS Managed Node Groups
+  # Enhanced EKS Managed Node Groups
   eks_managed_node_groups = {
+    # GPU-optimized nodes for neuromorphic processing
     gpu_nodes = {
-      name = "gpu-nodes"
+      name = "${local.name_prefix}-gpu-nodes"
 
-      instance_types = var.node_instance_types
-      capacity_type  = "ON_DEMAND"
+      instance_types = var.gpu_node_instance_types
+      capacity_type  = var.environment == "prod" ? "ON_DEMAND" : "SPOT"
 
-      min_size     = var.min_size
-      max_size     = var.max_size
-      desired_size = var.desired_size
+      min_size     = var.gpu_nodes_min_size
+      max_size     = var.gpu_nodes_max_size
+      desired_size = var.gpu_nodes_desired_size
 
-      ami_type = "AL2_x86_64_GPU"
+      ami_type                   = "AL2_x86_64_GPU"
+      use_custom_launch_template = true
 
-      # Launch template
-      launch_template_name    = "${var.cluster_name}-gpu-lt"
+      # Enhanced launch template configuration
+      launch_template_name    = "${local.cluster_name}-gpu-lt"
       launch_template_version = "$Latest"
+      
+      # Block device mappings for GPU workloads
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = 100
+            volume_type           = "gp3"
+            iops                  = 3000
+            throughput            = 150
+            encrypted             = var.enable_encryption_at_rest
+            kms_key_id           = var.enable_encryption_at_rest ? aws_kms_key.ebs[0].arn : null
+            delete_on_termination = true
+          }
+        }
+      }
 
+      # Network configuration
+      subnet_ids = module.vpc.private_subnets
+      
+      # Update strategy
       update_config = {
         max_unavailable_percentage = 25
       }
-
+      
+      # Enhanced labels and taints
       labels = {
-        role = "gpu-worker"
-        accelerator = "nvidia-tesla-t4"
+        role                    = "gpu-worker"
+        "node-type"            = "gpu"
+        "workload-type"        = "neuromorphic"
+        "nvidia.com/gpu.present" = "true"
       }
 
       taints = {
@@ -177,34 +293,153 @@ module "eks" {
           value  = "true"
           effect = "NO_SCHEDULE"
         }
+        neuromorphic = {
+          key    = "workload.neuromorphic/dedicated"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
       }
 
-      tags = {
-        ExtraTag = "gpu-nodes"
+      # Enhanced metadata options
+      metadata_options = {
+        http_endpoint = "enabled"
+        http_tokens   = "required"
+        http_put_response_hop_limit = 2
+        instance_metadata_tags      = "enabled"
       }
+
+      tags = merge(local.common_tags, {
+        NodeGroup = "gpu-nodes"
+        Workload  = "neuromorphic-vision"
+      })
     }
 
+    # CPU nodes for general workloads
     cpu_nodes = {
-      name = "cpu-nodes"
+      name = "${local.name_prefix}-cpu-nodes"
 
-      instance_types = ["m5.large", "m5.xlarge"]
-      capacity_type  = "SPOT"
+      instance_types = var.cpu_node_instance_types
+      capacity_type  = var.environment == "prod" ? "ON_DEMAND" : "SPOT"
+
+      min_size     = var.cpu_nodes_min_size
+      max_size     = var.cpu_nodes_max_size
+      desired_size = var.cpu_nodes_desired_size
+
+      ami_type = "AL2_x86_64"
+      use_custom_launch_template = true
+
+      # Block device mappings
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = 50
+            volume_type           = "gp3"
+            iops                  = 3000
+            throughput            = 125
+            encrypted             = var.enable_encryption_at_rest
+            kms_key_id           = var.enable_encryption_at_rest ? aws_kms_key.ebs[0].arn : null
+            delete_on_termination = true
+          }
+        }
+      }
+
+      # Network configuration
+      subnet_ids = module.vpc.private_subnets
+      
+      # Update strategy
+      update_config = {
+        max_unavailable_percentage = 33
+      }
+      
+      labels = {
+        role         = "cpu-worker"
+        "node-type" = "cpu"
+        "workload-type" = "general"
+      }
+
+      # Enhanced metadata options
+      metadata_options = {
+        http_endpoint = "enabled"
+        http_tokens   = "required"
+        http_put_response_hop_limit = 2
+        instance_metadata_tags      = "enabled"
+      }
+
+      tags = merge(local.common_tags, {
+        NodeGroup = "cpu-nodes"
+        Workload  = "general"
+      })
+    }
+
+    # Monitoring and system nodes
+    system_nodes = {
+      name = "${local.name_prefix}-system-nodes"
+
+      instance_types = ["m5.large"]
+      capacity_type  = "ON_DEMAND"
 
       min_size     = 1
-      max_size     = 10
-      desired_size = 2
+      max_size     = 3
+      desired_size = 1
 
+      ami_type = "AL2_x86_64"
+      
       labels = {
-        role = "cpu-worker"
+        role         = "system-worker"
+        "node-type" = "system"
+        "workload-type" = "monitoring"
       }
 
-      tags = {
-        ExtraTag = "cpu-nodes"
+      taints = {
+        system = {
+          key    = "node-role.kubernetes.io/system"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
       }
+
+      tags = merge(local.common_tags, {
+        NodeGroup = "system-nodes"
+        Workload  = "monitoring"
+      })
     }
   }
 
-  # Cluster access entry
+  # Fargate profiles for serverless workloads
+  fargate_profiles = {
+    karpenter = {
+      name = "karpenter"
+      selectors = [
+        {
+          namespace = "karpenter"
+        }
+      ]
+      
+      subnet_ids = module.vpc.private_subnets
+      
+      tags = merge(local.common_tags, {
+        Profile = "karpenter"
+      })
+    }
+    
+    monitoring = {
+      name = "monitoring"
+      selectors = [
+        {
+          namespace = "monitoring"
+        }
+      ]
+      
+      subnet_ids = module.vpc.private_subnets
+      
+      tags = merge(local.common_tags, {
+        Profile = "monitoring"
+      })
+    }
+  }
+
+  # Enhanced cluster access management
   access_entries = {
     cluster_admin = {
       kubernetes_groups = ["system:masters"]
@@ -221,146 +456,81 @@ module "eks" {
     }
   }
 
-  tags = {
-    Environment = "production"
-    Project     = "spike-snn-event"
-  }
+  # Comprehensive cluster tags
+  tags = local.common_tags
 }
 
-# Configure kubectl
-provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+# =====================================================================================
+# IAM ROLES FOR SERVICE ACCOUNTS (IRSA)
+# =====================================================================================
 
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
-  }
-}
+# EBS CSI Driver IRSA
+module "ebs_csi_irsa_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
 
-provider "helm" {
-  kubernetes {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  role_name             = "${local.name_prefix}-ebs-csi"
+  attach_ebs_csi_policy = true
 
-    exec {
-      api_version = "client.authentication.k8s.io/v1beta1"
-      command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
-    }
-  }
-}
-
-# Install NVIDIA Device Plugin
-resource "helm_release" "nvidia_device_plugin" {
-  name       = "nvidia-device-plugin"
-  repository = "https://nvidia.github.io/k8s-device-plugin"
-  chart      = "nvidia-device-plugin"
-  version    = "0.14.1"
-  namespace  = "kube-system"
-
-  set {
-    name  = "gfd.enabled"
-    value = "true"
-  }
-
-  depends_on = [module.eks]
-}
-
-# Install AWS Load Balancer Controller
-resource "helm_release" "aws_load_balancer_controller" {
-  name       = "aws-load-balancer-controller"
-  repository = "https://aws.github.io/eks-charts"
-  chart      = "aws-load-balancer-controller"
-  version    = "1.6.2"
-  namespace  = "kube-system"
-
-  set {
-    name  = "clusterName"
-    value = module.eks.cluster_name
-  }
-
-  set {
-    name  = "serviceAccount.create"
-    value = "false"
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "aws-load-balancer-controller"
-  }
-
-  depends_on = [module.eks, kubernetes_service_account.aws_load_balancer_controller]
-}
-
-# Service account for AWS Load Balancer Controller
-resource "kubernetes_service_account" "aws_load_balancer_controller" {
-  metadata {
-    name      = "aws-load-balancer-controller"
-    namespace = "kube-system"
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.aws_load_balancer_controller.arn
+  oidc_providers = {
+    ex = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
     }
   }
 
-  depends_on = [module.eks]
+  tags = local.common_tags
 }
 
-# IAM role for AWS Load Balancer Controller
-resource "aws_iam_role" "aws_load_balancer_controller" {
-  name = "${var.cluster_name}-alb-controller"
+# AWS Load Balancer Controller IRSA
+module "load_balancer_controller_irsa_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = module.eks.oidc_provider_arn
-        }
-        Condition = {
-          StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
+  role_name                              = "${local.name_prefix}-load-balancer-controller"
+  attach_load_balancer_controller_policy = true
+
+  oidc_providers = {
+    ex = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+    }
+  }
+
+  tags = local.common_tags
 }
 
-resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
-  policy_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/AWSLoadBalancerControllerIAMPolicy"
-  role       = aws_iam_role.aws_load_balancer_controller.name
+# Cluster Autoscaler IRSA
+module "cluster_autoscaler_irsa_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name                        = "${local.name_prefix}-cluster-autoscaler"
+  attach_cluster_autoscaler_policy = true
+  cluster_autoscaler_cluster_ids   = [module.eks.cluster_name]
+
+  oidc_providers = {
+    ex = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:cluster-autoscaler"]
+    }
+  }
+
+  tags = local.common_tags
 }
 
-# EBS CSI Driver
-resource "aws_eks_addon" "ebs_csi" {
-  cluster_name = module.eks.cluster_name
-  addon_name   = "aws-ebs-csi-driver"
-  addon_version = "v1.24.0-eksbuild.1"
-  
-  depends_on = [module.eks]
-}
-
-# CloudWatch Container Insights
-resource "aws_eks_addon" "cloudwatch_observability" {
-  cluster_name = module.eks.cluster_name
-  addon_name   = "amazon-cloudwatch-observability"
-  addon_version = "v1.2.0-eksbuild.1"
-  
-  depends_on = [module.eks]
-}
+# =====================================================================================
+# STORAGE - S3 BUCKETS AND EFS
+# =====================================================================================
 
 # S3 bucket for model storage
 resource "aws_s3_bucket" "model_storage" {
-  bucket = "${var.cluster_name}-models-${random_id.bucket_suffix.hex}"
-}
-
-resource "random_id" "bucket_suffix" {
-  byte_length = 4
+  bucket = local.model_bucket_name
+  
+  tags = merge(local.common_tags, {
+    Name        = "Model Storage"
+    StorageType = "Models"
+  })
 }
 
 resource "aws_s3_bucket_versioning" "model_storage" {
@@ -375,19 +545,175 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "model_storage" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = var.enable_encryption_at_rest ? "aws:kms" : "AES256"
+      kms_master_key_id = var.enable_encryption_at_rest ? aws_kms_key.s3[0].arn : null
     }
   }
 }
 
-# ECR Repository
+resource "aws_s3_bucket_lifecycle_configuration" "model_storage" {
+  bucket = aws_s3_bucket.model_storage.id
+
+  rule {
+    id     = "transition_to_ia"
+    status = "Enabled"
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 365
+    }
+  }
+}
+
+# S3 bucket for backups
+resource "aws_s3_bucket" "backups" {
+  bucket = local.backup_bucket_name
+  
+  tags = merge(local.common_tags, {
+    Name        = "Backup Storage"
+    StorageType = "Backups"
+  })
+}
+
+resource "aws_s3_bucket_versioning" "backups" {
+  bucket = aws_s3_bucket.backups.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "backups" {
+  bucket = aws_s3_bucket.backups.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = var.enable_encryption_at_rest ? "aws:kms" : "AES256"
+      kms_master_key_id = var.enable_encryption_at_rest ? aws_kms_key.s3[0].arn : null
+    }
+  }
+}
+
+# KMS key for S3 encryption
+resource "aws_kms_key" "s3" {
+  count = var.enable_encryption_at_rest ? 1 : 0
+  
+  description             = "S3 Bucket Encryption Key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-s3-key"
+  })
+}
+
+resource "aws_kms_alias" "s3" {
+  count = var.enable_encryption_at_rest ? 1 : 0
+  
+  name          = "alias/${local.name_prefix}-s3"
+  target_key_id = aws_kms_key.s3[0].key_id
+}
+
+# EFS for shared storage
+resource "aws_efs_file_system" "shared_storage" {
+  count = var.enable_efs ? 1 : 0
+  
+  creation_token   = "${local.name_prefix}-efs"
+  performance_mode = "generalPurpose"
+  throughput_mode  = "provisioned"
+  provisioned_throughput_in_mibps = 1024
+  
+  encrypted  = var.enable_encryption_at_rest
+  kms_key_id = var.enable_encryption_at_rest ? aws_kms_key.efs[0].arn : null
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-efs"
+  })
+}
+
+resource "aws_kms_key" "efs" {
+  count = var.enable_efs && var.enable_encryption_at_rest ? 1 : 0
+  
+  description             = "EFS Encryption Key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-efs-key"
+  })
+}
+
+resource "aws_efs_mount_target" "shared_storage" {
+  count = var.enable_efs ? length(module.vpc.private_subnets) : 0
+  
+  file_system_id  = aws_efs_file_system.shared_storage[0].id
+  subnet_id       = module.vpc.private_subnets[count.index]
+  security_groups = [aws_security_group.efs[0].id]
+}
+
+resource "aws_security_group" "efs" {
+  count = var.enable_efs ? 1 : 0
+  
+  name_prefix = "${local.name_prefix}-efs-"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port = 2049
+    to_port   = 2049
+    protocol  = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-efs-sg"
+  })
+}
+
+# =====================================================================================
+# CONTAINER REGISTRY - ECR
+# =====================================================================================
+
 resource "aws_ecr_repository" "spike_snn_event" {
-  name                 = "spike-snn-event"
+  name                 = "${local.name_prefix}/neuromorphic-vision"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
+
+  encryption_configuration {
+    encryption_type = var.enable_encryption_at_rest ? "KMS" : "AES256"
+    kms_key        = var.enable_encryption_at_rest ? aws_kms_key.ecr[0].arn : null
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_kms_key" "ecr" {
+  count = var.enable_encryption_at_rest ? 1 : 0
+  
+  description             = "ECR Repository Encryption Key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ecr-key"
+  })
 }
 
 resource "aws_ecr_lifecycle_policy" "spike_snn_event" {
@@ -397,12 +723,38 @@ resource "aws_ecr_lifecycle_policy" "spike_snn_event" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 30 images"
+        description  = "Keep last 50 production images"
         selection = {
           tagStatus     = "tagged"
-          tagPrefixList = ["v"]
+          tagPrefixList = ["v", "prod"]
           countType     = "imageCountMoreThan"
-          countNumber   = 30
+          countNumber   = 50
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep last 10 development images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["dev", "staging"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 3
+        description  = "Delete untagged images older than 7 days"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 7
         }
         action = {
           type = "expire"
@@ -412,43 +764,26 @@ resource "aws_ecr_lifecycle_policy" "spike_snn_event" {
   })
 }
 
-# Outputs
-output "cluster_endpoint" {
-  description = "Endpoint for EKS control plane"
-  value       = module.eks.cluster_endpoint
-}
+# ECR Repository policy for cross-account access
+resource "aws_ecr_repository_policy" "spike_snn_event" {
+  repository = aws_ecr_repository.spike_snn_event.name
 
-output "cluster_security_group_id" {
-  description = "Security group ID attached to the EKS cluster"
-  value       = module.eks.cluster_security_group_id
-}
-
-output "cluster_iam_role_name" {
-  description = "IAM role name associated with EKS cluster"
-  value       = module.eks.cluster_iam_role_name
-}
-
-output "cluster_certificate_authority_data" {
-  description = "Base64 encoded certificate data required to communicate with the cluster"
-  value       = module.eks.cluster_certificate_authority_data
-}
-
-output "cluster_name" {
-  description = "Name of the EKS cluster"
-  value       = module.eks.cluster_name
-}
-
-output "node_groups" {
-  description = "EKS node groups"
-  value       = module.eks.eks_managed_node_groups
-}
-
-output "ecr_repository_url" {
-  description = "URL of the ECR repository"
-  value       = aws_ecr_repository.spike_snn_event.repository_url
-}
-
-output "model_storage_bucket" {
-  description = "S3 bucket for model storage"
-  value       = aws_s3_bucket.model_storage.bucket
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowPull"
+        Effect = "Allow"
+        Principal = {
+          AWS = [
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+          ]
+        }
+        Action = [
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+      }
+    ]
+  })
 }

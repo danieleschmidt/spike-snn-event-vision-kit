@@ -24,6 +24,11 @@ except ImportError:
     TORCH_AVAILABLE = False
 
 
+class SpikeNNError(Exception):
+    """Base exception class for Spike SNN Event Vision Kit."""
+    pass
+
+
 class ValidationError:
     """Validation error information."""
     
@@ -33,6 +38,21 @@ class ValidationError:
         self.field = field
         self.value = value
         self.severity = severity
+
+
+class HardwareError(SpikeNNError):
+    """Raised when hardware-related errors occur."""
+    pass
+
+
+class DataIntegrityError(SpikeNNError):
+    """Raised when data integrity checks fail."""
+    pass
+
+
+class CircuitBreakerError(SpikeNNError):
+    """Raised when circuit breaker is open."""
+    pass
     
 
 class ValidationResult:
@@ -586,9 +606,518 @@ class EventValidator:
         return result
 
 
+class StreamIntegrityValidator:
+    """Real-time validation of event stream integrity and quality."""
+    
+    def __init__(self, window_size: int = 1000, max_frequency_hz: float = 10000):
+        self.logger = logging.getLogger(__name__)
+        self.window_size = window_size
+        self.max_frequency_hz = max_frequency_hz
+        self.event_history = []
+        self.integrity_stats = {
+            'total_events': 0,
+            'corrupted_events': 0,
+            'out_of_order_events': 0,
+            'duplicate_events': 0,
+            'frequency_violations': 0,
+            'last_check_time': time.time()
+        }
+        
+    def validate_event_stream_integrity(self, events: List[List[float]]) -> ValidationResult:
+        """Validate event stream for real-time integrity."""
+        result = ValidationResult()
+        
+        if not events:
+            result.add_warning("EMPTY_STREAM", "Event stream is empty")
+            return result
+            
+        # Update statistics
+        self.integrity_stats['total_events'] += len(events)
+        
+        # Check temporal consistency
+        temporal_result = self._validate_temporal_consistency(events)
+        result.errors.extend(temporal_result.errors)
+        result.warnings.extend(temporal_result.warnings)
+        if not temporal_result.is_valid:
+            result.is_valid = False
+            
+        # Check for duplicates
+        duplicate_result = self._detect_duplicate_events(events)
+        result.errors.extend(duplicate_result.errors)
+        result.warnings.extend(duplicate_result.warnings)
+        if not duplicate_result.is_valid:
+            result.is_valid = False
+            
+        # Check event frequency
+        frequency_result = self._validate_event_frequency(events)
+        result.errors.extend(frequency_result.errors)
+        result.warnings.extend(frequency_result.warnings)
+        if not frequency_result.is_valid:
+            result.is_valid = False
+            
+        # Check data quality
+        quality_result = self._validate_data_quality(events)
+        result.errors.extend(quality_result.errors)
+        result.warnings.extend(quality_result.warnings)
+        if not quality_result.is_valid:
+            result.is_valid = False
+            
+        # Update event history for sliding window analysis
+        self._update_event_history(events)
+        
+        return result
+        
+    def _validate_temporal_consistency(self, events: List[List[float]]) -> ValidationResult:
+        """Check that events are temporally ordered."""
+        result = ValidationResult()
+        
+        for i in range(1, len(events)):
+            prev_time = events[i-1][2]
+            curr_time = events[i][2]
+            
+            if curr_time < prev_time:
+                self.integrity_stats['out_of_order_events'] += 1
+                result.add_error(
+                    "TEMPORAL_DISORDER",
+                    f"Event {i} timestamp {curr_time} < previous timestamp {prev_time}",
+                    f"events[{i}]",
+                    curr_time
+                )
+                break  # Stop after first violation for performance
+                
+        return result
+        
+    def _detect_duplicate_events(self, events: List[List[float]]) -> ValidationResult:
+        """Detect duplicate events in the stream."""
+        result = ValidationResult()
+        
+        seen_events = set()
+        duplicates = 0
+        
+        for i, event in enumerate(events[:100]):  # Check first 100 for performance
+            event_tuple = tuple(event)
+            if event_tuple in seen_events:
+                duplicates += 1
+                if duplicates == 1:  # Report only first duplicate
+                    result.add_warning(
+                        "DUPLICATE_EVENT",
+                        f"Duplicate event detected at index {i}",
+                        f"events[{i}]",
+                        event
+                    )
+            else:
+                seen_events.add(event_tuple)
+                
+        if duplicates > 0:
+            self.integrity_stats['duplicate_events'] += duplicates
+            
+        return result
+        
+    def _validate_event_frequency(self, events: List[List[float]]) -> ValidationResult:
+        """Check event frequency for abnormal patterns."""
+        result = ValidationResult()
+        
+        if len(events) < 2:
+            return result
+            
+        # Calculate time span
+        time_span = events[-1][2] - events[0][2]
+        if time_span <= 0:
+            result.add_error("INVALID_TIME_SPAN", "Invalid time span in event stream")
+            return result
+            
+        # Calculate frequency
+        frequency = len(events) / time_span
+        
+        if frequency > self.max_frequency_hz:
+            self.integrity_stats['frequency_violations'] += 1
+            result.add_warning(
+                "HIGH_FREQUENCY",
+                f"Event frequency {frequency:.1f} Hz exceeds maximum {self.max_frequency_hz} Hz",
+                "frequency",
+                frequency
+            )
+            
+        # Check for suspicious clustering
+        if len(events) >= 10:
+            cluster_result = self._detect_event_clustering(events)
+            result.errors.extend(cluster_result.errors)
+            result.warnings.extend(cluster_result.warnings)
+            
+        return result
+        
+    def _detect_event_clustering(self, events: List[List[float]]) -> ValidationResult:
+        """Detect abnormal event clustering."""
+        result = ValidationResult()
+        
+        # Check if too many events happen in a short time window
+        window_duration = 0.001  # 1ms window
+        max_events_per_window = 50
+        
+        for i in range(len(events) - max_events_per_window):
+            window_start = events[i][2]
+            window_end = events[i + max_events_per_window - 1][2]
+            
+            if window_end - window_start < window_duration:
+                result.add_warning(
+                    "EVENT_CLUSTERING",
+                    f"Excessive event clustering: {max_events_per_window} events in {window_end - window_start:.6f}s",
+                    f"events[{i}:{i+max_events_per_window}]"
+                )
+                break
+                
+        return result
+        
+    def _validate_data_quality(self, events: List[List[float]]) -> ValidationResult:
+        """Validate data quality metrics."""
+        result = ValidationResult()
+        
+        # Check for noise patterns
+        noise_result = self._detect_noise_patterns(events)
+        result.errors.extend(noise_result.errors)
+        result.warnings.extend(noise_result.warnings)
+        
+        # Check spatial distribution
+        spatial_result = self._validate_spatial_distribution(events)
+        result.errors.extend(spatial_result.errors)
+        result.warnings.extend(spatial_result.warnings)
+        
+        return result
+        
+    def _detect_noise_patterns(self, events: List[List[float]]) -> ValidationResult:
+        """Detect noise patterns in event data."""
+        result = ValidationResult()
+        
+        if len(events) < 10:
+            return result
+            
+        # Check for excessive hot pixels
+        pixel_counts = {}
+        for event in events[:1000]:  # Sample first 1000 events
+            pixel = (int(event[0]), int(event[1]))
+            pixel_counts[pixel] = pixel_counts.get(pixel, 0) + 1
+            
+        max_pixel_count = max(pixel_counts.values()) if pixel_counts else 0
+        if max_pixel_count > len(events) * 0.1:  # Single pixel > 10% of events
+            result.add_warning(
+                "HOT_PIXEL_DETECTED",
+                f"Hot pixel detected with {max_pixel_count} events",
+                "spatial_distribution"
+            )
+            
+        return result
+        
+    def _validate_spatial_distribution(self, events: List[List[float]]) -> ValidationResult:
+        """Validate spatial distribution of events."""
+        result = ValidationResult()
+        
+        if len(events) < 10:
+            return result
+            
+        # Extract coordinates
+        x_coords = [event[0] for event in events[:100]]
+        y_coords = [event[1] for event in events[:100]]
+        
+        # Check for reasonable coordinate ranges
+        x_range = max(x_coords) - min(x_coords)
+        y_range = max(y_coords) - min(y_coords)
+        
+        if x_range == 0 and y_range == 0:
+            result.add_warning(
+                "STATIC_EVENTS",
+                "All events at same spatial location",
+                "spatial_distribution"
+            )
+        elif x_range > 10000 or y_range > 10000:
+            result.add_error(
+                "UNREASONABLE_COORDINATES",
+                f"Coordinate range too large: x={x_range}, y={y_range}",
+                "spatial_distribution"
+            )
+            
+        return result
+        
+    def _update_event_history(self, events: List[List[float]]):
+        """Update sliding window of event history."""
+        self.event_history.extend(events)
+        
+        # Keep only recent events
+        if len(self.event_history) > self.window_size:
+            self.event_history = self.event_history[-self.window_size:]
+            
+    def get_integrity_stats(self) -> Dict[str, Any]:
+        """Get integrity statistics."""
+        stats = self.integrity_stats.copy()
+        stats['integrity_ratio'] = 1.0 - (stats['corrupted_events'] / max(1, stats['total_events']))
+        stats['check_duration'] = time.time() - stats['last_check_time']
+        return stats
+        
+    def reset_stats(self):
+        """Reset integrity statistics."""
+        self.integrity_stats = {
+            'total_events': 0,
+            'corrupted_events': 0,
+            'out_of_order_events': 0,
+            'duplicate_events': 0,
+            'frequency_violations': 0,
+            'last_check_time': time.time()
+        }
+
+
+class ModelOutputValidator:
+    """Validator for SNN model outputs with sanity checks."""
+    
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        
+    def validate_snn_output(self, output: Any, expected_shape: Optional[Tuple] = None,
+                          expected_range: Optional[Tuple[float, float]] = None,
+                          model_name: str = "SNN") -> ValidationResult:
+        """Validate SNN model output."""
+        result = ValidationResult()
+        
+        # Type validation
+        if TORCH_AVAILABLE and isinstance(output, torch.Tensor):
+            tensor_result = self._validate_tensor_output(output, expected_shape, expected_range)
+            result.errors.extend(tensor_result.errors)
+            result.warnings.extend(tensor_result.warnings)
+            if not tensor_result.is_valid:
+                result.is_valid = False
+        elif isinstance(output, np.ndarray):
+            array_result = self._validate_array_output(output, expected_shape, expected_range)
+            result.errors.extend(array_result.errors)
+            result.warnings.extend(array_result.warnings)
+            if not array_result.is_valid:
+                result.is_valid = False
+        else:
+            result.add_error(
+                "UNSUPPORTED_OUTPUT_TYPE",
+                f"Unsupported output type: {type(output)}",
+                "output_type",
+                type(output).__name__
+            )
+            return result
+            
+        # SNN-specific validations
+        snn_result = self._validate_snn_characteristics(output)
+        result.errors.extend(snn_result.errors)
+        result.warnings.extend(snn_result.warnings)
+        if not snn_result.is_valid:
+            result.is_valid = False
+            
+        return result
+        
+    def _validate_tensor_output(self, tensor: 'torch.Tensor', expected_shape: Optional[Tuple],
+                              expected_range: Optional[Tuple[float, float]]) -> ValidationResult:
+        """Validate PyTorch tensor output."""
+        result = ValidationResult()
+        
+        # Shape validation
+        if expected_shape and tensor.shape != expected_shape:
+            result.add_error(
+                "SHAPE_MISMATCH",
+                f"Output shape {tensor.shape} != expected {expected_shape}",
+                "shape"
+            )
+            
+        # Check for invalid values
+        if torch.any(torch.isnan(tensor)):
+            result.add_error("NAN_VALUES", "Output contains NaN values", "values")
+            
+        if torch.any(torch.isinf(tensor)):
+            result.add_error("INF_VALUES", "Output contains infinite values", "values")
+            
+        # Range validation
+        if expected_range:
+            min_val, max_val = expected_range
+            if torch.any(tensor < min_val) or torch.any(tensor > max_val):
+                actual_min = torch.min(tensor).item()
+                actual_max = torch.max(tensor).item()
+                result.add_error(
+                    "RANGE_VIOLATION",
+                    f"Output range [{actual_min:.6f}, {actual_max:.6f}] outside expected {expected_range}",
+                    "range"
+                )
+                
+        return result
+        
+    def _validate_array_output(self, array: np.ndarray, expected_shape: Optional[Tuple],
+                             expected_range: Optional[Tuple[float, float]]) -> ValidationResult:
+        """Validate numpy array output."""
+        result = ValidationResult()
+        
+        # Shape validation
+        if expected_shape and array.shape != expected_shape:
+            result.add_error(
+                "SHAPE_MISMATCH",
+                f"Output shape {array.shape} != expected {expected_shape}",
+                "shape"
+            )
+            
+        # Check for invalid values
+        if np.any(np.isnan(array)):
+            result.add_error("NAN_VALUES", "Output contains NaN values", "values")
+            
+        if np.any(np.isinf(array)):
+            result.add_error("INF_VALUES", "Output contains infinite values", "values")
+            
+        # Range validation
+        if expected_range:
+            min_val, max_val = expected_range
+            if np.any(array < min_val) or np.any(array > max_val):
+                actual_min = np.min(array)
+                actual_max = np.max(array)
+                result.add_error(
+                    "RANGE_VIOLATION",
+                    f"Output range [{actual_min:.6f}, {actual_max:.6f}] outside expected {expected_range}",
+                    "range"
+                )
+                
+        return result
+        
+    def _validate_snn_characteristics(self, output: Union['torch.Tensor', np.ndarray]) -> ValidationResult:
+        """Validate SNN-specific output characteristics."""
+        result = ValidationResult()
+        
+        # For spike trains, values should typically be 0 or 1
+        if TORCH_AVAILABLE and isinstance(output, torch.Tensor):
+            unique_values = torch.unique(output)
+            non_binary = torch.any((unique_values != 0) & (unique_values != 1))
+        else:
+            unique_values = np.unique(output)
+            non_binary = np.any((unique_values != 0) & (unique_values != 1))
+            
+        if non_binary:
+            if len(unique_values) > 10:  # Too many unique values for spike data
+                result.add_warning(
+                    "NON_BINARY_SPIKES",
+                    f"Output contains {len(unique_values)} unique values, expected binary spikes",
+                    "spike_characteristics"
+                )
+            else:
+                result.add_warning(
+                    "ANALOG_OUTPUT",
+                    f"Analog output detected with values: {unique_values}",
+                    "spike_characteristics"
+                )
+                
+        # Check spike rate
+        if TORCH_AVAILABLE and isinstance(output, torch.Tensor):
+            spike_rate = torch.mean(output.float()).item()
+        else:
+            spike_rate = np.mean(output.astype(float))
+            
+        if spike_rate > 0.5:
+            result.add_warning(
+                "HIGH_SPIKE_RATE",
+                f"High spike rate: {spike_rate:.3f} (>50%)",
+                "spike_rate",
+                spike_rate
+            )
+        elif spike_rate < 0.001:
+            result.add_warning(
+                "LOW_SPIKE_RATE",
+                f"Very low spike rate: {spike_rate:.6f} (<0.1%)",
+                "spike_rate",
+                spike_rate
+            )
+            
+        return result
+
+
+class CircuitBreaker:
+    """Circuit breaker pattern for hardware backend failures."""
+    
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 60.0,
+                 expected_call_frequency: float = 1.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.expected_call_frequency = expected_call_frequency
+        self.failure_count = 0
+        self.last_failure_time = 0
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+        self.last_call_time = time.time()
+        self.logger = logging.getLogger(__name__)
+        
+    def call(self, func: Callable, *args, **kwargs) -> Any:
+        """Execute function with circuit breaker protection."""
+        current_time = time.time()
+        
+        # Check if circuit should be closed due to inactivity
+        if (current_time - self.last_call_time) > (1.0 / self.expected_call_frequency * 10):
+            self._reset()
+            
+        self.last_call_time = current_time
+        
+        if self.state == "OPEN":
+            if current_time - self.last_failure_time > self.recovery_timeout:
+                self.state = "HALF_OPEN"
+                self.logger.info("Circuit breaker transitioning to HALF_OPEN")
+            else:
+                raise CircuitBreakerError(
+                    f"Circuit breaker OPEN. Retry after {self.recovery_timeout - (current_time - self.last_failure_time):.1f}s"
+                )
+                
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure(e)
+            raise
+            
+    def _on_success(self):
+        """Handle successful call."""
+        if self.state == "HALF_OPEN":
+            self._reset()
+            self.logger.info("Circuit breaker reset to CLOSED after successful call")
+            
+    def _on_failure(self, error: Exception):
+        """Handle failed call."""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = "OPEN"
+            self.logger.error(
+                f"Circuit breaker OPEN after {self.failure_count} failures. "
+                f"Last error: {error}"
+            )
+        else:
+            self.logger.warning(
+                f"Circuit breaker failure {self.failure_count}/{self.failure_threshold}: {error}"
+            )
+            
+    def _reset(self):
+        """Reset circuit breaker to closed state."""
+        self.failure_count = 0
+        self.state = "CLOSED"
+        self.last_failure_time = 0
+        
+    def get_state(self) -> Dict[str, Any]:
+        """Get circuit breaker state."""
+        return {
+            "state": self.state,
+            "failure_count": self.failure_count,
+            "failure_threshold": self.failure_threshold,
+            "time_until_retry": max(0, self.recovery_timeout - (time.time() - self.last_failure_time)) if self.state == "OPEN" else 0,
+            "last_failure_time": self.last_failure_time
+        }
+
+
 def get_event_validator():
     """Get event validator instance."""
     return EventValidator()
+
+
+def get_stream_integrity_validator():
+    """Get stream integrity validator instance."""
+    return StreamIntegrityValidator()
+
+
+def get_model_output_validator():
+    """Get model output validator instance."""
+    return ModelOutputValidator()
 
 
 def validate_and_handle(data, validator_func, operation: str, strict: bool = True) -> bool:

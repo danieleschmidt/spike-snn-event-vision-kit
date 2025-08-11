@@ -1,0 +1,454 @@
+# =====================================================================================
+# PRODUCTION VALUES - NEUROMORPHIC VISION PROCESSING SYSTEM
+# =====================================================================================
+# Production-ready configuration for enterprise-scale neuromorphic vision processing
+# with comprehensive monitoring, security, and compliance features.
+# =====================================================================================
+
+# Global configuration
+global:
+  # Image registry configuration
+  imageRegistry: ""
+  imageCredentials:
+    registry: ""
+    username: ""
+    password: ""
+    email: ""
+  
+  # Storage class for persistent volumes
+  storageClass: "gp3"
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  
+  # Network policies
+  networkPolicy:
+    enabled: true
+    ingress: []
+    egress: []
+  
+  # Pod security standards
+  podSecurityPolicy:
+    enabled: true
+    policy: restricted
+  
+  # Common labels
+  commonLabels:
+    app.kubernetes.io/name: spike-snn-event
+    app.kubernetes.io/part-of: neuromorphic-vision
+    app.kubernetes.io/managed-by: helm
+  
+  # Common annotations
+  commonAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9090"
+
+# Override base values for production
+replicaCount: 5
+
+image:
+  repository: spike-snn-event/neuromorphic-vision
+  tag: "v1.0.0"
+  pullPolicy: Always
+
+resources:
+  limits:
+    cpu: 8000m
+    memory: 16Gi
+    nvidia.com/gpu: 1
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+    nvidia.com/gpu: 1
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 50
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+  customMetrics:
+    - type: Pods
+      pods:
+        metric:
+          name: inference_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "50"
+    - type: Pods
+      pods:
+        metric:
+          name: gpu_utilization
+        target:
+          type: AverageValue
+          averageValue: "80"
+
+# Production ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    external-dns.alpha.kubernetes.io/hostname: "neuromorphic.production.com"
+  hosts:
+    - host: neuromorphic.production.com
+      paths:
+        - path: /
+          pathType: Prefix
+        - path: /api
+          pathType: Prefix
+  tls:
+    - secretName: neuromorphic-production-tls
+      hosts:
+        - neuromorphic.production.com
+
+# Production persistence configuration
+persistence:
+  enabled: true
+  storageClass: "gp3"
+  accessMode: ReadWriteOnce
+  size: 500Gi
+  mountPath: /app/models
+  
+  # Additional storage for data
+  dataStorage:
+    enabled: true
+    storageClass: "gp3"
+    accessMode: ReadWriteOnce
+    size: 200Gi
+    mountPath: /app/data
+  
+  # Log storage
+  logStorage:
+    enabled: true
+    storageClass: "gp3"
+    accessMode: ReadWriteOnce
+    size: 100Gi
+    mountPath: /app/logs
+
+# Production monitoring
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      labels:
+        environment: production
+        team: ai-platform
+      interval: 15s
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'neuromorphic_.*'
+          action: keep
+  
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+      configMaps:
+        - name: neuromorphic-production-dashboard
+          folder: /tmp/dashboards
+
+# Production security configuration
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8000
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+      - protocol: TCP
+        port: 9090
+  egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      ports:
+      - protocol: TCP
+        port: 53
+      - protocol: UDP
+        port: 53
+
+# Production environment variables
+env:
+  - name: APP_ENV
+    value: "production"
+  - name: LOG_LEVEL
+    value: "INFO"
+  - name: DEBUG
+    value: "false"
+  - name: CUDA_VISIBLE_DEVICES
+    value: "all"
+  - name: NVIDIA_VISIBLE_DEVICES
+    value: "all"
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: database-credentials
+        key: url
+  - name: REDIS_URL
+    valueFrom:
+      secretKeyRef:
+        name: redis-credentials
+        key: url
+  - name: JWT_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: app-secrets
+        key: jwt-secret
+  - name: ENCRYPTION_KEY
+    valueFrom:
+      secretKeyRef:
+        name: app-secrets
+        key: encryption-key
+  - name: MODEL_STORAGE_PATH
+    value: "/app/models"
+  - name: DATA_STORAGE_PATH
+    value: "/app/data"
+  - name: PROMETHEUS_METRICS_PORT
+    value: "9090"
+  - name: HEALTH_CHECK_PORT
+    value: "8081"
+
+# Production health checks
+probes:
+  readiness:
+    enabled: true
+    path: /ready
+    port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    enabled: true
+    path: /health
+    port: 8081
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  startup:
+    enabled: true
+    path: /startup
+    port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 12
+
+# Pod disruption budget for high availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Node selection for GPU nodes
+nodeSelector:
+  workload-type: neuromorphic
+  node-type: gpu
+  nvidia.com/gpu.present: "true"
+
+# Tolerations for GPU nodes
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+  - key: workload.neuromorphic/dedicated
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
+# Anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app.kubernetes.io/name
+          operator: In
+          values:
+          - spike-snn-event
+      topologyKey: kubernetes.io/hostname
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - spike-snn-event
+        topologyKey: topology.kubernetes.io/zone
+
+# Production service account with IRSA
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/neuromorphic-vision-prod-role"
+  name: "neuromorphic-vision-prod"
+
+# Production configuration
+config:
+  model:
+    name: "SpikingYOLOv5-Production"
+    input_size: [640, 640]
+    num_classes: 80
+    backend: "cuda"
+    precision: "fp16"
+    optimization: "tensorrt"
+  
+  inference:
+    batch_size: 16
+    max_queue_size: 500
+    timeout: 60.0
+    enable_caching: true
+    cache_size: 1000
+    enable_batching: true
+    max_batch_delay: 50
+  
+  scaling:
+    min_instances: 3
+    max_instances: 50
+    cpu_threshold: 60.0
+    memory_threshold: 70.0
+    gpu_threshold: 80.0
+    queue_threshold: 100
+    scale_up_cooldown: 60
+    scale_down_cooldown: 300
+  
+  monitoring:
+    enable_metrics: true
+    metrics_port: 9090
+    log_level: "INFO"
+    enable_tracing: true
+    trace_sampling_rate: 0.1
+    enable_profiling: true
+    profiling_port: 6060
+
+# Production GPU configuration
+gpu:
+  enabled: true
+  count: 1
+  type: "nvidia-tesla-t4"
+  memory: "16Gi"
+  compute_capability: "7.5"
+  driver_version: "535.86.10"
+  cuda_version: "12.2"
+
+# Training job configuration for production
+training:
+  enabled: true
+  image:
+    repository: spike-snn-event/neuromorphic-vision
+    tag: "training-v1.0.0"
+  resources:
+    limits:
+      memory: "32Gi"
+      cpu: "16000m"
+      nvidia.com/gpu: 4
+    requests:
+      memory: "16Gi"
+      cpu: "8000m"
+      nvidia.com/gpu: 4
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 1000Gi
+  schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+  
+  nodeSelector:
+    workload-type: training
+    node-type: gpu
+    instance-size: xlarge
+  
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+    - key: workload.training/dedicated
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+# Backup and disaster recovery
+backup:
+  enabled: true
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  retention: "30d"
+  storage:
+    type: "s3"
+    bucket: "neuromorphic-production-backups"
+    region: "us-west-2"
+    encryption: true
+
+# Compliance and security
+compliance:
+  gdpr:
+    enabled: true
+    dataRetentionDays: 90
+    anonymizationEnabled: true
+  
+  hipaa:
+    enabled: false
+  
+  soc2:
+    enabled: true
+    auditLogging: true
+    accessControls: true
+
+# Feature flags
+featureFlags:
+  enableAdvancedProcessing: true
+  enableGPUAcceleration: true
+  enableDistributedInference: true
+  enableRealTimeProcessing: true
+  enableBatchProcessing: true
+  enableModelCaching: true
+  enableMetricsCollection: true
+  enableDistributedTracing: true
+  enableA/BTesting: true
+
+# Quality of Service
+qos:
+  class: "Guaranteed"
+  priority: 100
+
+# Chaos engineering
+chaosEngineering:
+  enabled: false  # Disabled in production by default
+  experiments:
+    - name: pod-failure
+      enabled: false
+    - name: network-latency
+      enabled: false
+    - name: cpu-stress
+      enabled: false

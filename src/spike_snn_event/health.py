@@ -17,8 +17,9 @@ import torch
 import numpy as np
 
 from .monitoring import get_metrics_collector, get_health_checker
-from .validation import ValidationError, HardwareError
+from .validation import ValidationError, HardwareError, CircuitBreakerError, DataIntegrityError
 from .security import get_input_sanitizer
+from .security_enhancements import get_adversarial_defense, get_memory_safety_manager
 
 
 @dataclass
@@ -463,3 +464,456 @@ def export_health_report(filepath: str = "health_report.json"):
     checker = get_system_health_checker()
     checker.export_health_report(filepath)
     return filepath
+
+
+class ResilientOperationManager:
+    """Manager for resilient operations with graceful degradation and recovery."""
+    
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.operation_history = {}
+        self.degradation_active = False
+        self.recovery_attempts = {}
+        
+        # Circuit breakers for different operation types
+        from .validation import CircuitBreaker
+        self.circuit_breakers = {
+            'model_inference': CircuitBreaker(failure_threshold=3, recovery_timeout=30.0),
+            'event_processing': CircuitBreaker(failure_threshold=5, recovery_timeout=10.0),
+            'data_loading': CircuitBreaker(failure_threshold=3, recovery_timeout=60.0),
+            'hardware_access': CircuitBreaker(failure_threshold=2, recovery_timeout=120.0)
+        }
+        
+    def execute_with_resilience(self, operation_name: str, operation_func: callable, 
+                              *args, fallback_func: callable = None, **kwargs):
+        """Execute operation with resilience patterns."""
+        if operation_name not in self.circuit_breakers:
+            operation_name = 'default'
+            
+        circuit_breaker = self.circuit_breakers.get(operation_name, self.circuit_breakers['event_processing'])
+        
+        try:
+            # Execute with circuit breaker protection
+            result = circuit_breaker.call(operation_func, *args, **kwargs)
+            self._record_successful_operation(operation_name)
+            return result
+            
+        except CircuitBreakerError as e:
+            self.logger.error(f"Circuit breaker open for {operation_name}: {e}")
+            if fallback_func:
+                self.logger.info(f"Attempting fallback for {operation_name}")
+                return self._execute_fallback(operation_name, fallback_func, *args, **kwargs)
+            else:
+                raise
+                
+        except Exception as e:
+            self.logger.error(f"Operation {operation_name} failed: {e}")
+            self._record_failed_operation(operation_name, str(e))
+            
+            # Try recovery if available
+            recovery_result = self._attempt_recovery(operation_name, e)
+            if recovery_result['recovered']:
+                self.logger.info(f"Recovery successful for {operation_name}")
+                return self.execute_with_resilience(operation_name, operation_func, *args, **kwargs)
+            
+            # Use fallback if recovery failed
+            if fallback_func:
+                return self._execute_fallback(operation_name, fallback_func, *args, **kwargs)
+            else:
+                raise
+                
+    def _execute_fallback(self, operation_name: str, fallback_func: callable, *args, **kwargs):
+        """Execute fallback operation."""
+        try:
+            self.logger.info(f"Executing fallback for {operation_name}")
+            result = fallback_func(*args, **kwargs)
+            self.degradation_active = True
+            return result
+        except Exception as e:
+            self.logger.error(f"Fallback failed for {operation_name}: {e}")
+            raise
+            
+    def _attempt_recovery(self, operation_name: str, error: Exception) -> Dict[str, Any]:
+        """Attempt recovery from operation failure."""
+        recovery_key = f"{operation_name}_{type(error).__name__}"
+        
+        if recovery_key not in self.recovery_attempts:
+            self.recovery_attempts[recovery_key] = {
+                'count': 0,
+                'last_attempt': 0,
+                'max_attempts': 3
+            }
+            
+        recovery_info = self.recovery_attempts[recovery_key]
+        current_time = time.time()
+        
+        # Check if we should attempt recovery
+        if (recovery_info['count'] >= recovery_info['max_attempts'] or
+            current_time - recovery_info['last_attempt'] < 60):  # Wait 60s between attempts
+            return {'recovered': False, 'reason': 'max_attempts_exceeded'}
+            
+        recovery_info['count'] += 1
+        recovery_info['last_attempt'] = current_time
+        
+        # Attempt specific recovery strategies
+        recovery_result = self._execute_recovery_strategy(operation_name, error)
+        
+        if recovery_result['recovered']:
+            # Reset recovery counter on success
+            recovery_info['count'] = 0
+            
+        return recovery_result
+        
+    def _execute_recovery_strategy(self, operation_name: str, error: Exception) -> Dict[str, Any]:
+        """Execute recovery strategy based on operation and error type."""
+        recovery_strategies = {
+            'model_inference': self._recover_model_inference,
+            'event_processing': self._recover_event_processing,
+            'data_loading': self._recover_data_loading,
+            'hardware_access': self._recover_hardware_access
+        }
+        
+        strategy_func = recovery_strategies.get(operation_name, self._generic_recovery)
+        
+        try:
+            return strategy_func(error)
+        except Exception as recovery_error:
+            self.logger.error(f"Recovery strategy failed: {recovery_error}")
+            return {'recovered': False, 'reason': str(recovery_error)}
+            
+    def _recover_model_inference(self, error: Exception) -> Dict[str, Any]:
+        """Recovery strategy for model inference failures."""
+        try:
+            import torch
+            if isinstance(error, torch.cuda.OutOfMemoryError):
+                # GPU memory recovery
+                torch.cuda.empty_cache()
+                import gc
+                gc.collect()
+                return {'recovered': True, 'action': 'gpu_memory_cleanup'}
+                
+            elif 'CUDA' in str(error):
+                # CUDA error recovery
+                try:
+                    torch.cuda.synchronize()
+                    return {'recovered': True, 'action': 'cuda_sync'}
+                except:
+                    return {'recovered': False, 'reason': 'cuda_sync_failed'}
+        except ImportError:
+            pass
+            
+        return {'recovered': False, 'reason': 'unknown_inference_error'}
+        
+    def _recover_event_processing(self, error: Exception) -> Dict[str, Any]:
+        """Recovery strategy for event processing failures."""
+        if isinstance(error, (MemoryError, OverflowError)):
+            # Memory-related recovery
+            memory_manager = get_memory_safety_manager()
+            cleanup_result = memory_manager.force_cleanup()
+            return {'recovered': True, 'action': 'memory_cleanup', 'details': cleanup_result}
+            
+        return {'recovered': False, 'reason': 'unknown_processing_error'}
+        
+    def _recover_data_loading(self, error: Exception) -> Dict[str, Any]:
+        """Recovery strategy for data loading failures."""
+        if isinstance(error, (FileNotFoundError, PermissionError)):
+            # File access recovery
+            return {'recovered': False, 'reason': 'file_access_error'}
+            
+        if isinstance(error, DataIntegrityError):
+            # Data integrity recovery
+            return {'recovered': False, 'reason': 'data_integrity_error'}
+            
+        return {'recovered': False, 'reason': 'unknown_data_error'}
+        
+    def _recover_hardware_access(self, error: Exception) -> Dict[str, Any]:
+        """Recovery strategy for hardware access failures."""
+        if isinstance(error, HardwareError):
+            # Hardware reset attempt
+            time.sleep(1.0)  # Brief pause
+            return {'recovered': True, 'action': 'hardware_reset_wait'}
+            
+        return {'recovered': False, 'reason': 'hardware_failure'}
+        
+    def _generic_recovery(self, error: Exception) -> Dict[str, Any]:
+        """Generic recovery strategy."""
+        # Basic cleanup and retry
+        import gc
+        gc.collect()
+        return {'recovered': True, 'action': 'generic_cleanup'}
+        
+    def _record_successful_operation(self, operation_name: str):
+        """Record successful operation."""
+        if operation_name not in self.operation_history:
+            self.operation_history[operation_name] = {'success': 0, 'failure': 0}
+        self.operation_history[operation_name]['success'] += 1
+        
+    def _record_failed_operation(self, operation_name: str, error_msg: str):
+        """Record failed operation."""
+        if operation_name not in self.operation_history:
+            self.operation_history[operation_name] = {'success': 0, 'failure': 0}
+        self.operation_history[operation_name]['failure'] += 1
+        
+    def get_resilience_stats(self) -> Dict[str, Any]:
+        """Get resilience statistics."""
+        circuit_states = {name: cb.get_state() for name, cb in self.circuit_breakers.items()}
+        
+        return {
+            'degradation_active': self.degradation_active,
+            'operation_history': self.operation_history,
+            'circuit_breaker_states': circuit_states,
+            'recovery_attempts': self.recovery_attempts,
+            'total_operations': sum(h['success'] + h['failure'] for h in self.operation_history.values()),
+            'success_rate': self._calculate_success_rate()
+        }
+        
+    def _calculate_success_rate(self) -> float:
+        """Calculate overall success rate."""
+        total_success = sum(h['success'] for h in self.operation_history.values())
+        total_operations = sum(h['success'] + h['failure'] for h in self.operation_history.values())
+        return total_success / max(1, total_operations)
+
+
+class ResourceMonitor:
+    """Comprehensive resource monitoring with alerts."""
+    
+    def __init__(self, alert_thresholds: Dict[str, float] = None):
+        self.logger = logging.getLogger(__name__)
+        self.alert_thresholds = alert_thresholds or {
+            'memory_percent': 85.0,
+            'gpu_memory_percent': 90.0,
+            'cpu_percent': 80.0,
+            'disk_percent': 90.0,
+            'inference_latency_ms': 1000.0,
+            'event_processing_rate': 100.0  # events per second minimum
+        }
+        
+        self.resource_history = []
+        self.alerts_triggered = []
+        self.memory_manager = get_memory_safety_manager()
+        
+    def monitor_resources(self) -> Dict[str, Any]:
+        """Monitor all system resources."""
+        current_time = time.time()
+        
+        # System resources
+        system_resources = self._monitor_system_resources()
+        
+        # GPU resources
+        gpu_resources = self._monitor_gpu_resources()
+        
+        # Application-specific metrics
+        app_metrics = self._monitor_application_metrics()
+        
+        # Combine all metrics
+        resource_snapshot = {
+            'timestamp': current_time,
+            'system': system_resources,
+            'gpu': gpu_resources,
+            'application': app_metrics
+        }
+        
+        # Check for alerts
+        alerts = self._check_alert_conditions(resource_snapshot)
+        if alerts:
+            self.alerts_triggered.extend(alerts)
+            
+        # Store in history
+        self.resource_history.append(resource_snapshot)
+        
+        # Keep only recent history (last hour)
+        cutoff_time = current_time - 3600
+        self.resource_history = [r for r in self.resource_history if r['timestamp'] > cutoff_time]
+        
+        return resource_snapshot
+        
+    def _monitor_system_resources(self) -> Dict[str, Any]:
+        """Monitor system-level resources."""
+        try:
+            import psutil
+            
+            # Memory
+            memory = psutil.virtual_memory()
+            
+            # CPU
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            
+            # Disk
+            disk = psutil.disk_usage('/')
+            
+            return {
+                'memory_total_gb': memory.total / (1024**3),
+                'memory_used_gb': memory.used / (1024**3),
+                'memory_percent': memory.percent,
+                'cpu_percent': cpu_percent,
+                'cpu_count': psutil.cpu_count(),
+                'disk_total_gb': disk.total / (1024**3),
+                'disk_used_gb': disk.used / (1024**3),
+                'disk_percent': (disk.used / disk.total) * 100,
+                'available': True
+            }
+        except ImportError:
+            return {'available': False, 'error': 'psutil not available'}
+        except Exception as e:
+            return {'available': False, 'error': str(e)}
+            
+    def _monitor_gpu_resources(self) -> Dict[str, Any]:
+        """Monitor GPU resources."""
+        try:
+            import torch
+            
+            if not torch.cuda.is_available():
+                return {'available': False, 'reason': 'cuda_not_available'}
+                
+            gpu_stats = []
+            for i in range(torch.cuda.device_count()):
+                memory_allocated = torch.cuda.memory_allocated(i) / (1024**3)
+                memory_cached = torch.cuda.memory_reserved(i) / (1024**3)
+                total_memory = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+                
+                gpu_stats.append({
+                    'device_id': i,
+                    'name': torch.cuda.get_device_name(i),
+                    'memory_allocated_gb': memory_allocated,
+                    'memory_cached_gb': memory_cached,
+                    'memory_total_gb': total_memory,
+                    'memory_percent': ((memory_allocated + memory_cached) / total_memory) * 100
+                })
+                
+            return {
+                'available': True,
+                'device_count': torch.cuda.device_count(),
+                'devices': gpu_stats
+            }
+        except Exception as e:
+            return {'available': False, 'error': str(e)}
+            
+    def _monitor_application_metrics(self) -> Dict[str, Any]:
+        """Monitor application-specific metrics."""
+        try:
+            # Memory safety metrics
+            memory_stats = self.memory_manager.monitor_memory_usage()
+            
+            # Adversarial defense metrics
+            defense_stats = get_adversarial_defense().get_defense_stats()
+            
+            return {
+                'memory_safety': memory_stats,
+                'adversarial_defense': defense_stats,
+                'available': True
+            }
+        except Exception as e:
+            return {'available': False, 'error': str(e)}
+            
+    def _check_alert_conditions(self, resource_snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Check for alert conditions."""
+        alerts = []
+        current_time = time.time()
+        
+        # System memory alert
+        if (resource_snapshot['system'].get('available', False) and 
+            resource_snapshot['system']['memory_percent'] > self.alert_thresholds['memory_percent']):
+            alerts.append({
+                'timestamp': current_time,
+                'type': 'memory_high',
+                'severity': 'warning',
+                'value': resource_snapshot['system']['memory_percent'],
+                'threshold': self.alert_thresholds['memory_percent'],
+                'message': f"High memory usage: {resource_snapshot['system']['memory_percent']:.1f}%"
+            })
+            
+        # GPU memory alert
+        if resource_snapshot['gpu'].get('available', False):
+            for gpu in resource_snapshot['gpu']['devices']:
+                if gpu['memory_percent'] > self.alert_thresholds['gpu_memory_percent']:
+                    alerts.append({
+                        'timestamp': current_time,
+                        'type': 'gpu_memory_high',
+                        'severity': 'warning',
+                        'device_id': gpu['device_id'],
+                        'value': gpu['memory_percent'],
+                        'threshold': self.alert_thresholds['gpu_memory_percent'],
+                        'message': f"High GPU memory usage on device {gpu['device_id']}: {gpu['memory_percent']:.1f}%"
+                    })
+                    
+        # CPU alert
+        if (resource_snapshot['system'].get('available', False) and 
+            resource_snapshot['system']['cpu_percent'] > self.alert_thresholds['cpu_percent']):
+            alerts.append({
+                'timestamp': current_time,
+                'type': 'cpu_high',
+                'severity': 'warning',
+                'value': resource_snapshot['system']['cpu_percent'],
+                'threshold': self.alert_thresholds['cpu_percent'],
+                'message': f"High CPU usage: {resource_snapshot['system']['cpu_percent']:.1f}%"
+            })
+            
+        return alerts
+        
+    def get_resource_trends(self) -> Dict[str, Any]:
+        """Get resource usage trends."""
+        if len(self.resource_history) < 2:
+            return {'insufficient_data': True}
+            
+        # Calculate trends over last 10 minutes
+        recent_cutoff = time.time() - 600
+        recent_data = [r for r in self.resource_history if r['timestamp'] > recent_cutoff]
+        
+        if len(recent_data) < 2:
+            return {'insufficient_recent_data': True}
+            
+        # Memory trend
+        memory_values = [r['system'].get('memory_percent', 0) for r in recent_data 
+                        if r['system'].get('available', False)]
+        
+        trends = {}
+        if memory_values:
+            trends['memory_trend'] = self._calculate_trend(memory_values)
+            
+        # Add recent alerts
+        recent_alerts = [a for a in self.alerts_triggered 
+                        if time.time() - a['timestamp'] < 300]  # Last 5 minutes
+        
+        return {
+            'trends': trends,
+            'recent_alerts': recent_alerts,
+            'alert_count': len(recent_alerts)
+        }
+        
+    def _calculate_trend(self, values: List[float]) -> str:
+        """Calculate trend direction."""
+        if len(values) < 2:
+            return 'insufficient_data'
+            
+        start_avg = np.mean(values[:len(values)//2])
+        end_avg = np.mean(values[len(values)//2:])
+        
+        change_percent = ((end_avg - start_avg) / start_avg) * 100 if start_avg > 0 else 0
+        
+        if change_percent > 5:
+            return 'increasing'
+        elif change_percent < -5:
+            return 'decreasing'
+        else:
+            return 'stable'
+
+
+# Global instances
+_global_resilient_operation_manager = None
+_global_resource_monitor = None
+
+
+def get_resilient_operation_manager() -> ResilientOperationManager:
+    """Get global resilient operation manager instance."""
+    global _global_resilient_operation_manager
+    if _global_resilient_operation_manager is None:
+        _global_resilient_operation_manager = ResilientOperationManager()
+    return _global_resilient_operation_manager
+
+
+def get_resource_monitor() -> ResourceMonitor:
+    """Get global resource monitor instance."""
+    global _global_resource_monitor
+    if _global_resource_monitor is None:
+        _global_resource_monitor = ResourceMonitor()
+    return _global_resource_monitor

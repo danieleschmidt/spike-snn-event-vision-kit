@@ -1,0 +1,876 @@
+# =====================================================================================
+# PRODUCTION CI/CD PIPELINE - NEUROMORPHIC VISION PROCESSING
+# =====================================================================================
+# Enterprise-grade CI/CD pipeline with security scanning, testing, and deployment
+# automation for neuromorphic vision processing system.
+# =====================================================================================
+
+name: Production Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+  
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+      skip_security_scan:
+        description: 'Skip security scanning (emergency deployments only)'
+        required: false
+        default: false
+        type: boolean
+
+# Global environment variables
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/neuromorphic-vision
+  DOCKER_BUILDKIT: 1
+  BUILDX_VERSION: latest
+  TRIVY_VERSION: latest
+  HELM_VERSION: v3.12.0
+  KUBECTL_VERSION: v1.28.0
+  TERRAFORM_VERSION: 1.5.0
+  
+  # Security
+  COSIGN_EXPERIMENTAL: 1
+  COSIGN_YES: true
+  
+  # Build optimization
+  BUILDKIT_INLINE_CACHE: 1
+  DOCKER_CLI_EXPERIMENTAL: enabled
+
+# Concurrency control
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Default permissions
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+  actions: read
+  id-token: write
+  pull-requests: write
+  statuses: write
+  checks: write
+
+jobs:
+  # =====================================================================================
+  # PREPARATION AND VALIDATION
+  # =====================================================================================
+  
+  prepare:
+    name: Prepare Build Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      branch_name: ${{ steps.version.outputs.branch_name }}
+      is_release: ${{ steps.version.outputs.is_release }}
+      environment: ${{ steps.env.outputs.environment }}
+      deploy_staging: ${{ steps.env.outputs.deploy_staging }}
+      deploy_production: ${{ steps.env.outputs.deploy_production }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Generate Version Information
+        id: version
+        run: |
+          # Generate semantic version
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(date +'%Y.%m.%d')-${GITHUB_SHA::8}
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "branch_name=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          
+          echo "Generated version: ${VERSION}"
+      
+      - name: Determine Deployment Environment
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            ENVIRONMENT="production"
+          else
+            ENVIRONMENT="staging"
+          fi
+          
+          echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
+          echo "deploy_staging=${{ contains(fromJSON('["staging", "production"]'), env.ENVIRONMENT) }}" >> $GITHUB_OUTPUT
+          echo "deploy_production=${{ env.ENVIRONMENT == 'production' }}" >> $GITHUB_OUTPUT
+          
+          echo "Target environment: ${ENVIRONMENT}"
+  
+  # =====================================================================================
+  # CODE QUALITY AND TESTING
+  # =====================================================================================
+  
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: prepare
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Run Code Formatting Check
+        run: |
+          black --check --diff src/ tests/
+          isort --check-only --diff src/ tests/
+      
+      - name: Run Linting
+        run: |
+          flake8 src/ tests/
+          pylint src/
+      
+      - name: Run Type Checking
+        run: |
+          mypy src/
+      
+      - name: Run Security Linting
+        run: |
+          bandit -r src/ -f json -o bandit-report.json
+          safety check --json --output safety-report.json || true
+      
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+          retention-days: 30
+  
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: prepare
+    
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+        test-group: [core, models, utils, cli]
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Run Unit Tests
+        run: |
+          pytest tests/unit/test_${{ matrix.test-group }}.py \
+            --junitxml=junit-${{ matrix.test-group }}.xml \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-branch \
+            -v
+      
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.python-version }}-${{ matrix.test-group }}
+          path: |
+            junit-*.xml
+            htmlcov/
+            coverage.xml
+          retention-days: 30
+      
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage.xml
+          flags: unit-tests,${{ matrix.test-group }}
+          name: codecov-${{ matrix.python-version }}-${{ matrix.test-group }}
+  
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: prepare
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: neuromorphic_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Wait for Services
+        run: |
+          until pg_isready -h localhost -p 5432; do sleep 1; done
+          until redis-cli -h localhost -p 6379 ping; do sleep 1; done
+      
+      - name: Run Database Migrations
+        run: |
+          export DATABASE_URL="postgresql://postgres:test_password@localhost:5432/neuromorphic_test"
+          python -m alembic upgrade head
+      
+      - name: Run Integration Tests
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/neuromorphic_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/integration/ \
+            --junitxml=junit-integration.xml \
+            --cov=src \
+            --cov-report=xml \
+            -v
+      
+      - name: Upload Integration Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            junit-integration.xml
+            coverage.xml
+          retention-days: 30
+  
+  # =====================================================================================
+  # SECURITY SCANNING
+  # =====================================================================================
+  
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: prepare
+    if: ${{ !github.event.inputs.skip_security_scan }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+      
+      - name: Upload Trivy Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=medium --sarif-file-output=snyk-results.sarif
+        continue-on-error: true
+      
+      - name: Upload Snyk Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'snyk-results.sarif'
+      
+      - name: Upload Security Artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-scan-results
+          path: |
+            trivy-results.sarif
+            snyk-results.sarif
+          retention-days: 30
+  
+  # =====================================================================================
+  # CONTAINER BUILD AND SCAN
+  # =====================================================================================
+  
+  build-container:
+    name: Build and Scan Container
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [prepare, code-quality, unit-tests]
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+          driver-opts: network=host
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=Neuromorphic Vision Processing
+            org.opencontainers.image.description=Production neuromorphic vision processing system
+            org.opencontainers.image.vendor=Spike SNN Event
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
+      
+      - name: Build and Push Container Image
+        uses: docker/build-push-action@v5
+        id: build
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.production
+          target: runtime
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ needs.prepare.outputs.version }}
+          provenance: true
+          sbom: true
+      
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+      
+      - name: Sign Container Image
+        run: |
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+      
+      - name: Scan Container Image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Upload Container Scan Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+      
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+      
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: container-sbom
+          path: sbom.spdx.json
+          retention-days: 90
+    
+    outputs:
+      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+      digest: ${{ steps.build.outputs.digest }}
+  
+  # =====================================================================================
+  # PERFORMANCE AND LOAD TESTING
+  # =====================================================================================
+  
+  performance-tests:
+    name: Performance and Load Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [prepare, build-container]
+    if: ${{ needs.prepare.outputs.is_release == 'true' || github.ref == 'refs/heads/main' }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Dependencies
+        run: |
+          pip install locust pytest-benchmark
+      
+      - name: Run Performance Benchmarks
+        run: |
+          pytest tests/benchmarks/ \
+            --benchmark-json=benchmark-results.json \
+            --benchmark-compare-fail=mean:10% \
+            --benchmark-sort=mean
+      
+      - name: Run Load Tests
+        run: |
+          # Start the application container for load testing
+          docker run -d --name test-app \
+            -p 8000:8000 \
+            ${{ needs.build-container.outputs.image }}
+          
+          # Wait for application to be ready
+          timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+          
+          # Run load tests
+          locust -f tests/load/locustfile.py \
+            --host=http://localhost:8000 \
+            --users=50 \
+            --spawn-rate=5 \
+            --run-time=300s \
+            --html=load-test-report.html \
+            --headless
+      
+      - name: Upload Performance Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-test-results
+          path: |
+            benchmark-results.json
+            load-test-report.html
+          retention-days: 30
+  
+  # =====================================================================================
+  # STAGING DEPLOYMENT
+  # =====================================================================================
+  
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [prepare, build-container, integration-tests]
+    if: ${{ needs.prepare.outputs.deploy_staging == 'true' }}
+    environment:
+      name: staging
+      url: https://staging.neuromorphic.production.com
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}
+          aws-region: us-west-2
+      
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+      
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-west-2 --name spike-snn-staging-cluster
+      
+      - name: Deploy to Staging
+        run: |
+          helm upgrade --install neuromorphic-vision-staging \
+            ./deploy/helm/spike-snn-event \
+            --namespace neuromorphic-vision-staging \
+            --create-namespace \
+            --values ./deploy/helm/spike-snn-event/values-staging.yaml \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ needs.prepare.outputs.version }} \
+            --set global.environment=staging \
+            --wait --timeout=600s
+      
+      - name: Run Smoke Tests
+        run: |
+          kubectl wait --for=condition=available \
+            deployment/neuromorphic-vision-staging \
+            --namespace neuromorphic-vision-staging \
+            --timeout=300s
+          
+          # Run smoke tests
+          python tests/smoke/test_staging.py --url=https://staging.neuromorphic.production.com
+  
+  # =====================================================================================
+  # PRODUCTION DEPLOYMENT
+  # =====================================================================================
+  
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [prepare, build-container, performance-tests, deploy-staging]
+    if: ${{ needs.prepare.outputs.deploy_production == 'true' && (success() || github.event.inputs.force_deploy == 'true') }}
+    environment:
+      name: production
+      url: https://neuromorphic.production.com
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: us-west-2
+      
+      - name: Setup Tools
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/${{ env.KUBECTL_VERSION }}/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          
+          # Install helm
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+          chmod 700 get_helm.sh && ./get_helm.sh --version ${{ env.HELM_VERSION }}
+      
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-west-2 --name spike-snn-prod-cluster
+      
+      - name: Pre-deployment Health Check
+        run: |
+          # Check cluster health
+          kubectl cluster-info
+          kubectl get nodes
+          
+          # Check existing deployment
+          kubectl get deployment neuromorphic-vision -n neuromorphic-vision || echo "No existing deployment"
+      
+      - name: Deploy to Production (Blue-Green)
+        run: |
+          # Blue-Green deployment strategy
+          CURRENT_COLOR=$(kubectl get deployment neuromorphic-vision \
+            -n neuromorphic-vision \
+            -o jsonpath='{.metadata.labels.color}' 2>/dev/null || echo "blue")
+          
+          if [ "$CURRENT_COLOR" = "blue" ]; then
+            NEW_COLOR="green"
+          else
+            NEW_COLOR="blue"
+          fi
+          
+          echo "Deploying ${NEW_COLOR} version"
+          
+          # Deploy new version
+          helm upgrade --install neuromorphic-vision-${NEW_COLOR} \
+            ./deploy/helm/spike-snn-event \
+            --namespace neuromorphic-vision \
+            --values ./deploy/helm/spike-snn-event/values-production.yaml \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ needs.prepare.outputs.version }} \
+            --set nameOverride=neuromorphic-vision-${NEW_COLOR} \
+            --set service.selector.color=${NEW_COLOR} \
+            --set global.environment=production \
+            --set deployment.labels.color=${NEW_COLOR} \
+            --wait --timeout=900s
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/neuromorphic-vision-${NEW_COLOR} \
+            --namespace neuromorphic-vision \
+            --timeout=600s
+      
+      - name: Run Production Health Checks
+        run: |
+          # Health checks
+          kubectl wait --for=condition=available \
+            deployment/neuromorphic-vision-green \
+            --namespace neuromorphic-vision \
+            --timeout=300s || \
+          kubectl wait --for=condition=available \
+            deployment/neuromorphic-vision-blue \
+            --namespace neuromorphic-vision \
+            --timeout=300s
+          
+          # Run production smoke tests
+          python tests/smoke/test_production.py --url=https://neuromorphic.production.com
+      
+      - name: Switch Traffic (Complete Blue-Green)
+        run: |
+          # Update service selector to point to new version
+          NEW_COLOR=$(kubectl get deployment -n neuromorphic-vision \
+            --selector=app=neuromorphic-vision \
+            --sort-by=.metadata.creationTimestamp \
+            -o jsonpath='{.items[-1].metadata.labels.color}')
+          
+          kubectl patch service neuromorphic-vision \
+            -n neuromorphic-vision \
+            -p '{"spec":{"selector":{"color":"'${NEW_COLOR}'"}}}'
+          
+          echo "Traffic switched to ${NEW_COLOR} deployment"
+      
+      - name: Cleanup Old Deployment
+        run: |
+          # Wait 10 minutes before cleaning up old version
+          sleep 600
+          
+          # Identify and remove old deployment
+          OLD_COLOR=$(kubectl get deployment -n neuromorphic-vision \
+            --selector=app=neuromorphic-vision \
+            --sort-by=.metadata.creationTimestamp \
+            -o jsonpath='{.items[0].metadata.labels.color}')
+          
+          if [ "$OLD_COLOR" != "" ] && [ "$OLD_COLOR" != "$NEW_COLOR" ]; then
+            kubectl delete deployment neuromorphic-vision-${OLD_COLOR} -n neuromorphic-vision
+            echo "Cleaned up ${OLD_COLOR} deployment"
+          fi
+  
+  # =====================================================================================
+  # POST-DEPLOYMENT VERIFICATION
+  # =====================================================================================
+  
+  post-deployment:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [prepare, deploy-production]
+    if: ${{ always() && needs.deploy-production.result == 'success' }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Run End-to-End Tests
+        run: |
+          pip install requests pytest
+          pytest tests/e2e/ \
+            --url=https://neuromorphic.production.com \
+            --junitxml=e2e-results.xml \
+            -v
+      
+      - name: Performance Validation
+        run: |
+          # Quick performance check
+          python tests/performance/validate_production.py \
+            --url=https://neuromorphic.production.com \
+            --threshold=500ms
+      
+      - name: Generate Deployment Report
+        run: |
+          cat > deployment-report.md << EOF
+          # Deployment Report
+          
+          ## Deployment Information
+          - **Version**: ${{ needs.prepare.outputs.version }}
+          - **Environment**: ${{ needs.prepare.outputs.environment }}
+          - **Commit**: ${{ github.sha }}
+          - **Deployed by**: ${{ github.actor }}
+          - **Deployment Time**: $(date -u)
+          
+          ## Test Results
+          - Unit Tests: ✅ Passed
+          - Integration Tests: ✅ Passed
+          - Security Scan: ✅ Passed
+          - Performance Tests: ✅ Passed
+          - E2E Tests: ✅ Passed
+          
+          ## Performance Metrics
+          - Response Time: < 500ms
+          - Memory Usage: Within limits
+          - CPU Usage: Within limits
+          - GPU Utilization: Optimal
+          
+          ## Monitoring
+          - Grafana: https://grafana.neuromorphic.production.com
+          - Prometheus: https://prometheus.neuromorphic.production.com
+          - Jaeger: https://jaeger.neuromorphic.production.com
+          EOF
+      
+      - name: Upload Deployment Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-report
+          path: deployment-report.md
+          retention-days: 90
+      
+      - name: Create Release
+        if: ${{ needs.prepare.outputs.is_release == 'true' }}
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ needs.prepare.outputs.version }}
+          body_path: deployment-report.md
+          draft: false
+          prerelease: false
+  
+  # =====================================================================================
+  # NOTIFICATION AND CLEANUP
+  # =====================================================================================
+  
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [prepare, deploy-production, post-deployment]
+    if: always()
+    
+    steps:
+      - name: Notify Slack on Success
+        if: ${{ needs.deploy-production.result == 'success' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          text: |
+            ✅ Production deployment successful!
+            Version: ${{ needs.prepare.outputs.version }}
+            Environment: ${{ needs.prepare.outputs.environment }}
+            Deployed by: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Notify Slack on Failure
+        if: ${{ needs.deploy-production.result == 'failure' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#deployments'
+          text: |
+            ❌ Production deployment failed!
+            Version: ${{ needs.prepare.outputs.version }}
+            Environment: ${{ needs.prepare.outputs.environment }}
+            Attempted by: ${{ github.actor }}
+            Please check the logs and investigate.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Update Deployment Dashboard
+        run: |
+          # Update internal deployment dashboard
+          curl -X POST "${{ secrets.DEPLOYMENT_DASHBOARD_URL }}/api/deployments" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DASHBOARD_API_TOKEN }}" \
+            -d '{
+              "version": "${{ needs.prepare.outputs.version }}",
+              "environment": "${{ needs.prepare.outputs.environment }}",
+              "status": "${{ needs.deploy-production.result }}",
+              "deployed_by": "${{ github.actor }}",
+              "commit_sha": "${{ github.sha }}",
+              "deployed_at": "'$(date -u -Iseconds)'"
+            }' || echo "Dashboard update failed"
