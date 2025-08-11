@@ -1,0 +1,681 @@
+# =====================================================================================
+# COMPREHENSIVE SECURITY POLICIES
+# =====================================================================================
+# Enterprise-grade security policies for neuromorphic vision processing including
+# Pod Security Standards, Network Policies, and Security Contexts.
+# =====================================================================================
+
+# Pod Security Policy (Restricted Profile)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: neuromorphic-restricted
+  namespace: neuromorphic-vision
+  labels:
+    security-profile: restricted
+    compliance: enterprise
+spec:
+  # Privilege and access controls
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities: []
+  
+  # User and group controls
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  
+  # Volume restrictions
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+    - 'csi'
+  
+  # Host restrictions
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts: []
+  
+  # SELinux
+  seLinux:
+    rule: 'RunAsAny'
+  
+  # Seccomp
+  seccompProfiles:
+    - 'runtime/default'
+  
+  # AppArmor (optional)
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+
+---
+# Role for PSP usage
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: neuromorphic-psp-user
+  namespace: neuromorphic-vision
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - neuromorphic-restricted
+
+---
+# Role binding for PSP
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: neuromorphic-psp-users
+  namespace: neuromorphic-vision
+roleRef:
+  kind: Role
+  name: neuromorphic-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: neuromorphic-vision
+  namespace: neuromorphic-vision
+- kind: ServiceAccount
+  name: gdpr-rights-service
+  namespace: neuromorphic-vision
+
+---
+# Network Policy - Default Deny All
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: neuromorphic-vision
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# Network Policy - Allow DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: neuromorphic-vision
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# Network Policy - Neuromorphic Vision App
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: neuromorphic-vision-netpol
+  namespace: neuromorphic-vision
+spec:
+  podSelector:
+    matchLabels:
+      app: neuromorphic-vision
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow ingress from Istio ingress gateway
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+      podSelector:
+        matchLabels:
+          app: istio-ingressgateway
+    ports:
+    - protocol: TCP
+      port: 8000
+  
+  # Allow health checks from kubelet
+  - from:
+    - ipBlock:
+        cidr: 10.0.0.0/16  # VPC CIDR
+    ports:
+    - protocol: TCP
+      port: 8081  # Health check port
+  
+  # Allow metrics collection
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090  # Metrics port
+  
+  # Allow Istio sidecar communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app: neuromorphic-vision
+    ports:
+    - protocol: TCP
+      port: 15090  # Istio proxy admin
+  
+  egress:
+  # Allow database access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow Redis access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  
+  # Allow GDPR service access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: gdpr-rights-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow S3 access (model storage)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  
+  # Allow Istio sidecar egress
+  - to:
+    - podSelector:
+        matchLabels:
+          app: neuromorphic-vision
+    ports:
+    - protocol: TCP
+      port: 15001  # Istio proxy
+
+---
+# Network Policy - Database Access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgresql-netpol
+  namespace: neuromorphic-vision
+spec:
+  podSelector:
+    matchLabels:
+      app: postgresql
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow access from neuromorphic vision app
+  - from:
+    - podSelector:
+        matchLabels:
+          app: neuromorphic-vision
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow access from GDPR service
+  - from:
+    - podSelector:
+        matchLabels:
+          app: gdpr-rights-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow monitoring access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9187  # PostgreSQL exporter
+  
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Allow backup to S3 (if configured)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# Security Context Constraints (OpenShift) / Pod Security Standards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-context-config
+  namespace: neuromorphic-vision
+  labels:
+    config-type: security
+data:
+  security-standards.yaml: |
+    # Pod Security Standards Configuration
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: neuromorphic-vision
+      labels:
+        pod-security.kubernetes.io/enforce: restricted
+        pod-security.kubernetes.io/audit: restricted
+        pod-security.kubernetes.io/warn: restricted
+        pod-security.kubernetes.io/enforce-version: latest
+        pod-security.kubernetes.io/audit-version: latest
+        pod-security.kubernetes.io/warn-version: latest
+  
+  security-context.yaml: |
+    # Recommended Security Context
+    securityContext:
+      # Pod-level security context
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      
+      # Seccomp profile
+      seccompProfile:
+        type: RuntimeDefault
+      
+      # SELinux options (if applicable)
+      seLinuxOptions:
+        level: "s0:c123,c456"
+    
+    containerSecurityContext:
+      # Container-level security context
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      
+      # Capabilities
+      capabilities:
+        drop:
+        - ALL
+        add: []  # No additional capabilities
+      
+      # Seccomp profile
+      seccompProfile:
+        type: RuntimeDefault
+
+---
+# RBAC - Service Account for Neuromorphic Vision
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neuromorphic-vision
+  namespace: neuromorphic-vision
+  labels:
+    app: neuromorphic-vision
+  annotations:
+    # AWS IAM role for service account (IRSA)
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/neuromorphic-vision-role"
+automountServiceAccountToken: true
+
+---
+# RBAC - Role for Neuromorphic Vision
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: neuromorphic-vision
+  namespace: neuromorphic-vision
+rules:
+# ConfigMap access (read-only)
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+
+# Secret access (read-only, specific secrets)
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+  resourceNames:
+  - "neuromorphic-tls"
+  - "model-encryption-keys"
+  - "database-credentials"
+  - "redis-credentials"
+
+# Pod information (for health checks)
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+  resourceNames: ["neuromorphic-vision-*"]
+
+# Events (for logging and monitoring)
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+
+# Service monitoring
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+
+---
+# RBAC - Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: neuromorphic-vision
+  namespace: neuromorphic-vision
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: neuromorphic-vision
+subjects:
+- kind: ServiceAccount
+  name: neuromorphic-vision
+  namespace: neuromorphic-vision
+
+---
+# Security Scanning Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-scanning-config
+  namespace: neuromorphic-vision
+  labels:
+    config-type: security-scanning
+data:
+  trivy-config.yaml: |
+    # Trivy security scanner configuration
+    cache:
+      backend: redis
+      redis:
+        addr: redis.neuromorphic-vision.svc.cluster.local:6379
+        password: ""
+        db: 2
+    
+    vulnerability:
+      type:
+        - os
+        - library
+      
+      severity:
+        - CRITICAL
+        - HIGH
+        - MEDIUM
+      
+      ignore-policy: |
+        # Ignore vulnerabilities in test dependencies
+        - path: ".trivyignore"
+        - cve: "CVE-2021-*"
+          reason: "Mitigated by network policies"
+    
+    misconfiguration:
+      scanners:
+        - dockerfile
+        - kubernetes
+        - terraform
+      
+      policy:
+        - "appshield"
+        - "cis"
+        - "nsa"
+    
+    secret:
+      scanners:
+        - general
+        - aws
+        - gcp
+        - github
+      
+      config:
+        # Exclude test files and docs
+        exclude:
+          - "**/*test*"
+          - "**/docs/**"
+          - "**/*.md"
+  
+  falco-config.yaml: |
+    # Falco runtime security configuration
+    rules:
+      - rule: Detect crypto miners
+        desc: Detect cryptocurrency miners
+        condition: spawned_process and proc.name in (crypto_miners)
+        output: Crypto miner detected (user=%user.name command=%proc.cmdline)
+        priority: CRITICAL
+      
+      - rule: Detect privilege escalation
+        desc: Detect attempts to gain elevated privileges
+        condition: spawned_process and proc.name in (su, sudo, doas) and not user.name in (allowed_users)
+        output: Privilege escalation attempt (user=%user.name command=%proc.cmdline)
+        priority: HIGH
+      
+      - rule: Detect network anomalies
+        desc: Detect unusual network connections
+        condition: inbound_connection and not fd.sport in (allowed_ports)
+        output: Unusual inbound connection (connection=%fd.name sport=%fd.sport dport=%fd.dport)
+        priority: MEDIUM
+      
+      - rule: Detect file system modifications
+        desc: Detect unauthorized file system changes
+        condition: write and fd.name startswith /etc/ and not proc.name in (allowed_processes)
+        output: Unauthorized file modification (file=%fd.name process=%proc.name)
+        priority: HIGH
+    
+    outputs:
+      - name: webhook
+        url: https://security-webhook.neuromorphic.production.com/alerts
+        headers:
+          Authorization: "Bearer ${WEBHOOK_TOKEN}"
+      
+      - name: syslog
+        server: syslog.monitoring.svc.cluster.local:514
+        protocol: tcp
+      
+      - name: prometheus
+        url: http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+
+---
+# Image Security Policy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: image-security-policy
+  namespace: neuromorphic-vision
+  labels:
+    config-type: image-security
+data:
+  policy.yaml: |
+    # Container Image Security Policy
+    
+    # Allowed registries
+    allowed_registries:
+      - ghcr.io/neuromorphic
+      - registry.neuromorphic.production.com
+      - gcr.io/distroless
+      - docker.io/library  # Only for base images
+    
+    # Prohibited registries
+    prohibited_registries:
+      - docker.io/*  # Except library
+      - quay.io/random
+      - registry-1.docker.io
+    
+    # Image requirements
+    requirements:
+      # Must be signed
+      signature_verification:
+        enabled: true
+        signers:
+          - neuromorphic-production-key
+          - distroless-key
+      
+      # Vulnerability scanning
+      vulnerability_scanning:
+        enabled: true
+        max_critical: 0
+        max_high: 2
+        max_medium: 10
+        scanner: "trivy"
+      
+      # Image metadata requirements
+      metadata:
+        required_labels:
+          - "org.opencontainers.image.version"
+          - "org.opencontainers.image.created"
+          - "org.opencontainers.image.source"
+          - "org.opencontainers.image.licenses"
+        
+        prohibited_labels:
+          - "maintainer"  # Deprecated
+      
+      # Base image requirements
+      base_images:
+        allowed:
+          - "gcr.io/distroless/*"
+          - "registry.neuromorphic.production.com/base/*"
+        
+        prohibited:
+          - "*:latest"  # No latest tags in production
+          - "alpine:*"  # Use distroless instead
+    
+    # Runtime requirements
+    runtime:
+      # User requirements
+      user:
+        run_as_root: false
+        required_uid: 1000
+        required_gid: 1000
+      
+      # Filesystem
+      filesystem:
+        read_only_root: true
+        writable_paths:
+          - "/tmp"
+          - "/var/tmp"
+          - "/app/logs"
+          - "/app/cache"
+      
+      # Capabilities
+      capabilities:
+        drop_all: true
+        allowed: []  # No additional capabilities
+      
+      # Security profiles
+      security_profiles:
+        seccomp: "runtime/default"
+        apparmor: "runtime/default"
+
+---
+# OPA Gatekeeper Constraint Template
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: neuromorphicsecuritypolicy
+  namespace: neuromorphic-vision
+spec:
+  crd:
+    spec:
+      names:
+        kind: NeuromorphicSecurityPolicy
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedRegistries:
+              type: array
+              items:
+                type: string
+            requiredSecurityContext:
+              type: object
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package neuromorphicsecuritypolicy
+        
+        violation[{"msg": msg}] {
+          # Check image registry
+          image := input.review.object.spec.containers[_].image
+          not starts_with(image, input.parameters.allowedRegistries[_])
+          msg := sprintf("Image %v is from unauthorized registry", [image])
+        }
+        
+        violation[{"msg": msg}] {
+          # Check security context
+          container := input.review.object.spec.containers[_]
+          not container.securityContext.runAsNonRoot
+          msg := "Container must run as non-root user"
+        }
+        
+        violation[{"msg": msg}] {
+          # Check for latest tag
+          image := input.review.object.spec.containers[_].image
+          endswith(image, ":latest")
+          msg := "Images must not use 'latest' tag in production"
+        }
+
+---
+# OPA Gatekeeper Constraint
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: NeuromorphicSecurityPolicy
+metadata:
+  name: neuromorphic-security-constraints
+  namespace: neuromorphic-vision
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    namespaces: ["neuromorphic-vision"]
+  parameters:
+    allowedRegistries:
+      - "ghcr.io/neuromorphic"
+      - "registry.neuromorphic.production.com"
+      - "gcr.io/distroless"
+    requiredSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      readOnlyRootFilesystem: true

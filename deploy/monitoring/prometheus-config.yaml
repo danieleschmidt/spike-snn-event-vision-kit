@@ -1,0 +1,494 @@
+# =====================================================================================
+# PROMETHEUS CONFIGURATION - NEUROMORPHIC VISION MONITORING
+# =====================================================================================
+# Comprehensive monitoring configuration for neuromorphic vision processing with
+# custom metrics, alerting rules, and service discovery.
+# =====================================================================================
+
+global:
+  # Scrape configuration
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  
+  # External labels for federation
+  external_labels:
+    cluster: 'neuromorphic-primary'
+    environment: 'production'
+    region: 'us-west-2'
+    service: 'neuromorphic-vision'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager.monitoring.svc.cluster.local:9093
+      timeout: 10s
+      api_version: v2
+
+# Rule files
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+  - "/etc/prometheus/recording-rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # ============================================================================
+  # KUBERNETES SERVICE DISCOVERY
+  # ============================================================================
+  
+  # Kubernetes API Server
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - default
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'apiserver_.*|kubernetes_.*'
+        action: keep
+  
+  # Kubernetes Nodes
+  - job_name: 'kubernetes-nodes'
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+  
+  # Kubernetes Nodes (Kubelet metrics)
+  - job_name: 'kubernetes-nodes-kubelet'
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_.*|kubelet_.*|kubernetes_.*'
+        action: keep
+  
+  # Kubernetes Pods
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+  
+  # Kubernetes Services
+  - job_name: 'kubernetes-services'
+    kubernetes_sd_configs:
+      - role: endpoints
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+        action: replace
+        target_label: __scheme__
+        regex: (https?)
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+  
+  # ============================================================================
+  # APPLICATION MONITORING
+  # ============================================================================
+  
+  # Neuromorphic Vision Application
+  - job_name: 'neuromorphic-vision'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - neuromorphic-vision
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: neuromorphic-vision
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: metrics
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: service
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'neuromorphic_.*|inference_.*|model_.*|gpu_.*|processing_.*'
+        action: keep
+  
+  # ============================================================================
+  # INFRASTRUCTURE MONITORING
+  # ============================================================================
+  
+  # Node Exporter
+  - job_name: 'node-exporter'
+    scrape_interval: 15s
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - monitoring
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: node-exporter
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'node_.*'
+        action: keep
+  
+  # cAdvisor
+  - job_name: 'cadvisor'
+    scrape_interval: 30s
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - monitoring
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: cadvisor
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_.*'
+        action: keep
+      - source_labels: [container]
+        regex: ''
+        action: drop
+  
+  # GPU Metrics (NVIDIA DCGM)
+  - job_name: 'nvidia-dcgm'
+    scrape_interval: 30s
+    kubernetes_sd_configs:
+      - role: endpoints
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: nvidia-dcgm-exporter
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'DCGM_.*'
+        action: keep
+  
+  # ============================================================================
+  # DATABASE MONITORING
+  # ============================================================================
+  
+  # PostgreSQL
+  - job_name: 'postgres-exporter'
+    scrape_interval: 30s
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - neuromorphic-vision
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: postgres-exporter
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'pg_.*'
+        action: keep
+  
+  # Redis
+  - job_name: 'redis-exporter'
+    scrape_interval: 30s
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - neuromorphic-vision
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: redis-exporter
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'redis_.*'
+        action: keep
+  
+  # ============================================================================
+  # SERVICE MESH MONITORING
+  # ============================================================================
+  
+  # Istio Control Plane
+  - job_name: 'istio-mesh'
+    scrape_interval: 15s
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - istio-system
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: istio-proxy;http-monitoring
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: service
+  
+  # Istio Proxy (Envoy) Metrics
+  - job_name: 'envoy-stats'
+    scrape_interval: 15s
+    metrics_path: /stats/prometheus
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: '.*-envoy-prom'
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'envoy_.*|istio_.*'
+        action: keep
+  
+  # ============================================================================
+  # EXTERNAL MONITORING
+  # ============================================================================
+  
+  # Blackbox Exporter for external endpoints
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://neuromorphic.production.com
+        - https://api.neuromorphic.production.com/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter.monitoring.svc.cluster.local:9115
+  
+  # Blackbox Exporter for TCP endpoints
+  - job_name: 'blackbox-tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+        - postgres:5432
+        - redis:6379
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter.monitoring.svc.cluster.local:9115
+  
+  # ============================================================================
+  # PROMETHEUS FEDERATION
+  # ============================================================================
+  
+  # Federation from other Prometheus instances
+  - job_name: 'prometheus-federation'
+    scrape_interval: 30s
+    honor_labels: true
+    metrics_path: '/federate'
+    params:
+      'match[]':
+        - '{job=~"neuromorphic.*"}'        # Neuromorphic-specific metrics
+        - '{__name__=~"job:.*"}'            # Job-level aggregations
+        - '{__name__=~"instance:.*"}'       # Instance-level aggregations
+        - 'up{job=~"neuromorphic.*"}'      # Service availability
+        - 'prometheus_build_info'           # Prometheus metadata
+    static_configs:
+      - targets:
+        - prometheus-us-east-1.monitoring.svc.cluster.local:9090
+        - prometheus-eu-west-1.monitoring.svc.cluster.local:9090
+        labels:
+          region: federation
+  
+  # ============================================================================
+  # CUSTOM METRICS EXPORTERS
+  # ============================================================================
+  
+  # Custom Business Metrics
+  - job_name: 'business-metrics'
+    scrape_interval: 60s
+    metrics_path: /business-metrics
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - neuromorphic-vision
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: business-metrics-exporter
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'business_.*|revenue_.*|usage_.*|customer_.*'
+        action: keep
+  
+  # Model Performance Metrics
+  - job_name: 'model-performance'
+    scrape_interval: 30s
+    metrics_path: /model-metrics
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - neuromorphic-vision
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: neuromorphic-vision
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: model-metrics
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'model_.*|inference_.*|accuracy_.*|latency_.*'
+        action: keep
+
+# Storage configuration
+storage:
+  tsdb:
+    # Retention settings
+    retention.time: 30d
+    retention.size: 100GB
+    
+    # Compaction settings
+    min-block-duration: 2h
+    max-block-duration: 25h
+    
+    # WAL settings
+    wal-compression: true
+    
+    # Exemplars settings
+    max-exemplars: 100000
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: "https://prometheus-remote-write.monitoring.svc.cluster.local/api/v1/write"
+    queue_config:
+      capacity: 10000
+      max_shards: 200
+      min_shards: 1
+      max_samples_per_send: 5000
+      batch_send_deadline: 5s
+      min_backoff: 30ms
+      max_backoff: 100ms
+      retry_on_http_429: true
+    write_relabel_configs:
+      # Only send high-value metrics to long-term storage
+      - source_labels: [__name__]
+        regex: 'neuromorphic_.*|inference_.*|model_.*|up|prometheus_build_info'
+        action: keep
+    metadata_config:
+      send: true
+      send_interval: 30s
+
+# Remote read configuration
+remote_read:
+  - url: "https://prometheus-remote-read.monitoring.svc.cluster.local/api/v1/read"
+    read_recent: true
+
+# Tracing configuration
+tracing:
+  endpoint: "jaeger-collector.monitoring.svc.cluster.local:14268"
+  sampling_fraction: 0.1

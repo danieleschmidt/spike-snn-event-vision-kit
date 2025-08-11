@@ -1,0 +1,739 @@
+# =====================================================================================
+# GLOBAL DEPLOYMENT MANAGER - MULTI-REGION NEUROMORPHIC VISION
+# =====================================================================================
+# Comprehensive multi-region deployment orchestration for global availability,
+# data locality compliance, and disaster recovery across US, EU, and APAC regions.
+# =====================================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-deployment-config
+  namespace: neuromorphic-system
+  labels:
+    app: global-deployment-manager
+    component: configuration
+data:
+  # Global deployment configuration
+  global-config.yaml: |
+    # Global deployment settings
+    global:
+      project: neuromorphic-vision
+      version: v1.0.0
+      
+      # Multi-region strategy
+      deployment_strategy: blue-green
+      rollout_strategy: canary
+      
+      # Global load balancing
+      load_balancer:
+        type: global
+        provider: aws-global-accelerator
+        
+        # Traffic distribution weights
+        traffic_distribution:
+          us-west-2: 40    # Primary region
+          us-east-1: 30    # Secondary US
+          eu-west-1: 20    # European region
+          ap-southeast-1: 10  # APAC region
+        
+        # Health check configuration
+        health_checks:
+          enabled: true
+          interval: 30s
+          timeout: 10s
+          unhealthy_threshold: 3
+          healthy_threshold: 2
+          path: /health
+      
+      # Data replication
+      data_replication:
+        strategy: active-active
+        consistency: eventual
+        
+        # Cross-region database replication
+        database:
+          type: postgresql
+          replication_mode: streaming
+          backup_retention: 30d
+          point_in_time_recovery: true
+        
+        # Cache synchronization
+        cache:
+          type: redis
+          sync_mode: async
+          conflict_resolution: last-write-wins
+      
+      # Monitoring and observability
+      observability:
+        distributed_tracing: true
+        cross_region_metrics: true
+        unified_logging: true
+        
+        # Alerting for cross-region issues
+        alerts:
+          cross_region_latency_threshold: 200ms
+          replication_lag_threshold: 5s
+          availability_threshold: 99.9
+    
+    # Region-specific configurations
+    regions:
+      # United States West (Primary)
+      us-west-2:
+        name: "US West (Oregon)"
+        primary: true
+        
+        # Infrastructure
+        infrastructure:
+          cluster_name: spike-snn-prod-cluster
+          kubernetes_version: "1.28"
+          
+          # Node configuration
+          node_groups:
+            gpu_nodes:
+              instance_types: ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
+              min_size: 3
+              max_size: 50
+              desired_size: 5
+            cpu_nodes:
+              instance_types: ["m5.large", "m5.xlarge", "m5.2xlarge"]
+              min_size: 2
+              max_size: 20
+              desired_size: 3
+        
+        # Storage
+        storage:
+          models:
+            type: s3
+            bucket: neuromorphic-models-us-west-2
+            replication: cross-region
+          data:
+            type: s3
+            bucket: neuromorphic-data-us-west-2
+            lifecycle_policy: true
+          backups:
+            type: s3
+            bucket: neuromorphic-backups-us-west-2
+            encryption: true
+        
+        # Networking
+        networking:
+          vpc_cidr: "10.0.0.0/16"
+          availability_zones: 3
+          nat_gateways: 3
+          
+        # Compliance
+        compliance:
+          data_residency: us
+          regulations: ["ccpa", "sox"]
+          audit_logging: true
+        
+        # Service configuration
+        services:
+          neuromorphic_vision:
+            replicas: 5
+            resources:
+              cpu: "2000m"
+              memory: "4Gi"
+              gpu: 1
+            autoscaling:
+              min_replicas: 3
+              max_replicas: 50
+              target_cpu: 70
+              target_memory: 80
+      
+      # United States East
+      us-east-1:
+        name: "US East (Virginia)"
+        primary: false
+        
+        infrastructure:
+          cluster_name: spike-snn-us-east-cluster
+          kubernetes_version: "1.28"
+          
+          node_groups:
+            gpu_nodes:
+              instance_types: ["g4dn.xlarge", "g4dn.2xlarge"]
+              min_size: 2
+              max_size: 30
+              desired_size: 3
+            cpu_nodes:
+              instance_types: ["m5.large", "m5.xlarge"]
+              min_size: 1
+              max_size: 15
+              desired_size: 2
+        
+        storage:
+          models:
+            type: s3
+            bucket: neuromorphic-models-us-east-1
+            replication_source: us-west-2
+          data:
+            type: s3
+            bucket: neuromorphic-data-us-east-1
+          backups:
+            type: s3
+            bucket: neuromorphic-backups-us-east-1
+            encryption: true
+        
+        networking:
+          vpc_cidr: "10.1.0.0/16"
+          availability_zones: 3
+          nat_gateways: 2
+        
+        compliance:
+          data_residency: us
+          regulations: ["ccpa", "sox"]
+          audit_logging: true
+        
+        services:
+          neuromorphic_vision:
+            replicas: 3
+            resources:
+              cpu: "1500m"
+              memory: "3Gi"
+              gpu: 1
+            autoscaling:
+              min_replicas: 2
+              max_replicas: 30
+              target_cpu: 70
+              target_memory: 80
+      
+      # Europe West
+      eu-west-1:
+        name: "EU West (Ireland)"
+        primary: false
+        
+        infrastructure:
+          cluster_name: spike-snn-eu-west-cluster
+          kubernetes_version: "1.28"
+          
+          node_groups:
+            gpu_nodes:
+              instance_types: ["g4dn.xlarge", "g4dn.2xlarge"]
+              min_size: 2
+              max_size: 25
+              desired_size: 3
+            cpu_nodes:
+              instance_types: ["m5.large", "m5.xlarge"]
+              min_size: 1
+              max_size: 12
+              desired_size: 2
+        
+        storage:
+          models:
+            type: s3
+            bucket: neuromorphic-models-eu-west-1
+            replication_source: us-west-2
+          data:
+            type: s3
+            bucket: neuromorphic-data-eu-west-1
+          backups:
+            type: s3
+            bucket: neuromorphic-backups-eu-west-1
+            encryption: true
+        
+        networking:
+          vpc_cidr: "10.2.0.0/16"
+          availability_zones: 3
+          nat_gateways: 2
+        
+        compliance:
+          data_residency: eu
+          regulations: ["gdpr", "dpa"]
+          audit_logging: true
+          data_protection_officer: required
+        
+        services:
+          neuromorphic_vision:
+            replicas: 3
+            resources:
+              cpu: "1500m"
+              memory: "3Gi"
+              gpu: 1
+            autoscaling:
+              min_replicas: 2
+              max_replicas: 25
+              target_cpu: 70
+              target_memory: 80
+      
+      # Asia Pacific Southeast
+      ap-southeast-1:
+        name: "APAC (Singapore)"
+        primary: false
+        
+        infrastructure:
+          cluster_name: spike-snn-apac-cluster
+          kubernetes_version: "1.28"
+          
+          node_groups:
+            gpu_nodes:
+              instance_types: ["g4dn.xlarge", "g4dn.2xlarge"]
+              min_size: 1
+              max_size: 20
+              desired_size: 2
+            cpu_nodes:
+              instance_types: ["m5.large", "m5.xlarge"]
+              min_size: 1
+              max_size: 10
+              desired_size: 2
+        
+        storage:
+          models:
+            type: s3
+            bucket: neuromorphic-models-ap-southeast-1
+            replication_source: us-west-2
+          data:
+            type: s3
+            bucket: neuromorphic-data-ap-southeast-1
+          backups:
+            type: s3
+            bucket: neuromorphic-backups-ap-southeast-1
+            encryption: true
+        
+        networking:
+          vpc_cidr: "10.3.0.0/16"
+          availability_zones: 3
+          nat_gateways: 2
+        
+        compliance:
+          data_residency: apac
+          regulations: ["pdpa", "pipeda"]
+          audit_logging: true
+        
+        services:
+          neuromorphic_vision:
+            replicas: 2
+            resources:
+              cpu: "1500m"
+              memory: "3Gi"
+              gpu: 1
+            autoscaling:
+              min_replicas: 1
+              max_replicas: 20
+              target_cpu: 70
+              target_memory: 80
+    
+    # Cross-region networking
+    networking:
+      # VPC peering connections
+      vpc_peering:
+        enabled: true
+        connections:
+          - from: us-west-2
+            to: us-east-1
+            cidr_blocks: ["10.0.0.0/16", "10.1.0.0/16"]
+          - from: us-west-2
+            to: eu-west-1
+            cidr_blocks: ["10.0.0.0/16", "10.2.0.0/16"]
+          - from: us-west-2
+            to: ap-southeast-1
+            cidr_blocks: ["10.0.0.0/16", "10.3.0.0/16"]
+      
+      # Transit Gateway (AWS)
+      transit_gateway:
+        enabled: true
+        regions: ["us-west-2", "us-east-1", "eu-west-1", "ap-southeast-1"]
+        route_tables:
+          - name: production
+            propagation: enabled
+            association: all-regions
+      
+      # Global Accelerator
+      global_accelerator:
+        enabled: true
+        listeners:
+          - protocol: TCP
+            port: 443
+            health_check:
+              protocol: HTTPS
+              path: /health
+              interval: 30
+        endpoints:
+          - region: us-west-2
+            weight: 128
+            health_check: true
+          - region: us-east-1
+            weight: 100
+            health_check: true
+          - region: eu-west-1
+            weight: 80
+            health_check: true
+          - region: ap-southeast-1
+            weight: 40
+            health_check: true
+      
+      # DNS and CDN
+      dns:
+        provider: route53
+        zones:
+          - name: neuromorphic.production.com
+            type: primary
+            health_checks: true
+            geolocation_routing: true
+        
+        records:
+          - name: api.neuromorphic.production.com
+            type: A
+            geolocation:
+              us: us-west-2-alb.elb.amazonaws.com
+              eu: eu-west-1-alb.elb.amazonaws.com
+              ap: ap-southeast-1-alb.elb.amazonaws.com
+            health_checks:
+              - region: us-west-2
+                endpoint: https://api-us-west-2.neuromorphic.production.com/health
+              - region: eu-west-1
+                endpoint: https://api-eu-west-1.neuromorphic.production.com/health
+              - region: ap-southeast-1
+                endpoint: https://api-ap-southeast-1.neuromorphic.production.com/health
+      
+      cdn:
+        provider: cloudfront
+        distributions:
+          - name: neuromorphic-global
+            origins:
+              - domain: api-us-west-2.neuromorphic.production.com
+                region: us-west-2
+                priority: 1
+              - domain: api-us-east-1.neuromorphic.production.com
+                region: us-east-1
+                priority: 2
+            
+            behaviors:
+              - path: "/api/v1/inference"
+                cache_policy: no-cache
+                origin_request_policy: cors-s3-origin
+              - path: "/static/*"
+                cache_policy: managed-caching-optimized
+                compress: true
+    
+    # Disaster recovery
+    disaster_recovery:
+      # RTO (Recovery Time Objective): Maximum acceptable downtime
+      rto: 4h
+      
+      # RPO (Recovery Point Objective): Maximum acceptable data loss
+      rpo: 1h
+      
+      # Backup strategy
+      backups:
+        frequency: continuous
+        retention: 30d
+        cross_region: true
+        encryption: true
+        
+        schedule:
+          full_backup: "0 2 * * 0"    # Weekly full backup
+          incremental: "0 */6 * * *"  # Every 6 hours
+          transaction_log: continuous
+      
+      # Failover procedures
+      failover:
+        automatic: true
+        threshold:
+          availability: 95%
+          latency: 5s
+          error_rate: 5%
+        
+        procedures:
+          - type: region_failover
+            priority: 1
+            conditions:
+              - primary_region_unavailable
+              - health_check_failures > 3
+            
+            actions:
+              - promote_secondary_region
+              - update_dns_records
+              - redirect_traffic
+              - notify_operations
+          
+          - type: service_failover
+            priority: 2
+            conditions:
+              - service_health_check_failures > 5
+              - response_time > 10s
+            
+            actions:
+              - restart_unhealthy_pods
+              - scale_up_healthy_regions
+              - isolate_affected_region
+      
+      # Recovery procedures
+      recovery:
+        validation_tests:
+          - health_checks
+          - data_consistency
+          - performance_benchmarks
+          - user_acceptance_tests
+        
+        rollback_strategy:
+          - automated_rollback_threshold: 10%_error_rate
+          - manual_approval_required: true
+          - rollback_timeout: 30m
+    
+    # Monitoring and alerting
+    monitoring:
+      # Cross-region monitoring
+      prometheus_federation:
+        enabled: true
+        central_prometheus: us-west-2
+        
+        federation_config:
+          scrape_interval: 30s
+          metrics:
+            - job:availability
+            - job:latency
+            - job:error_rate
+            - neuromorphic_*
+      
+      # Grafana global dashboards
+      grafana:
+        global_dashboards:
+          - multi_region_overview
+          - cross_region_latency
+          - data_replication_status
+          - disaster_recovery_metrics
+      
+      # Alerting rules
+      alerts:
+        cross_region:
+          - name: RegionUnavailable
+            expression: up{job="neuromorphic-vision"} == 0
+            duration: 2m
+            severity: critical
+            
+          - name: HighCrossRegionLatency
+            expression: histogram_quantile(0.95, cross_region_latency_seconds) > 0.2
+            duration: 5m
+            severity: warning
+          
+          - name: DataReplicationLag
+            expression: database_replication_lag_seconds > 30
+            duration: 2m
+            severity: warning
+          
+          - name: TrafficImbalance
+            expression: |
+              (
+                max(rate(neuromorphic_requests_total[5m])) by (region) -
+                min(rate(neuromorphic_requests_total[5m])) by (region)
+              ) / max(rate(neuromorphic_requests_total[5m])) by (region) > 0.5
+            duration: 10m
+            severity: info
+      
+      # Health check endpoints
+      health_checks:
+        global:
+          endpoint: /health/global
+          checks:
+            - database_connectivity
+            - cross_region_replication
+            - cache_synchronization
+            - external_dependencies
+        
+        regional:
+          endpoint: /health/regional
+          checks:
+            - local_database
+            - local_cache
+            - kubernetes_api
+            - gpu_availability
+      
+    # Security and compliance
+    security:
+      # Encryption
+      encryption:
+        at_rest: true
+        in_transit: true
+        cross_region_replication: true
+        
+        key_management:
+          provider: aws-kms
+          rotation_enabled: true
+          rotation_interval: 90d
+          
+          regional_keys:
+            us-west-2: arn:aws:kms:us-west-2:ACCOUNT:key/us-west-2-key
+            us-east-1: arn:aws:kms:us-east-1:ACCOUNT:key/us-east-1-key
+            eu-west-1: arn:aws:kms:eu-west-1:ACCOUNT:key/eu-west-1-key
+            ap-southeast-1: arn:aws:kms:ap-southeast-1:ACCOUNT:key/ap-southeast-1-key
+      
+      # Network security
+      network_security:
+        vpc_flow_logs: true
+        security_groups:
+          strict_egress: true
+          minimal_ingress: true
+        
+        web_application_firewall:
+          enabled: true
+          rules:
+            - rate_limiting
+            - geo_blocking
+            - sql_injection_protection
+            - xss_protection
+      
+      # Access control
+      access_control:
+        rbac:
+          enabled: true
+          regional_isolation: true
+        
+        api_keys:
+          regional_scoping: true
+          rotation_required: true
+          expiration: 90d
+      
+      # Compliance frameworks
+      compliance:
+        frameworks:
+          gdpr:
+            enabled: true
+            regions: ["eu-west-1"]
+            features:
+              - data_minimization
+              - right_to_erasure
+              - data_portability
+              - consent_management
+          
+          ccpa:
+            enabled: true
+            regions: ["us-west-2", "us-east-1"]
+            features:
+              - do_not_sell
+              - data_deletion
+              - data_transparency
+          
+          pdpa:
+            enabled: true
+            regions: ["ap-southeast-1"]
+            features:
+              - consent_withdrawal
+              - data_portability
+              - breach_notification
+        
+        audit:
+          enabled: true
+          log_retention: 7y
+          tamper_protection: true
+          cross_region_replication: true
+
+---
+# Global Deployment Manager Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: global-deployment-manager
+  namespace: neuromorphic-system
+  labels:
+    app: global-deployment-manager
+    component: controller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: global-deployment-manager
+      component: controller
+  template:
+    metadata:
+      labels:
+        app: global-deployment-manager
+        component: controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: global-deployment-manager
+      containers:
+      - name: controller
+        image: neuromorphic/global-deployment-manager:v1.0.0
+        ports:
+        - containerPort: 8080
+          name: metrics
+        - containerPort: 8081
+          name: health
+        - containerPort: 8443
+          name: webhook
+        env:
+        - name: GLOBAL_CONFIG_PATH
+          value: /etc/config/global-config.yaml
+        - name: LOG_LEVEL
+          value: INFO
+        - name: METRICS_ADDR
+          value: ":8080"
+        - name: HEALTH_ADDR
+          value: ":8081"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: certs
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: global-deployment-config
+      - name: certs
+        secret:
+          secretName: webhook-server-certs
+      terminationGracePeriodSeconds: 10
+
+---
+# Service Account for Global Deployment Manager
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: global-deployment-manager
+  namespace: neuromorphic-system
+
+---
+# RBAC for Global Deployment Manager
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: global-deployment-manager
+rules:
+- apiGroups: ["", "apps", "extensions"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["networking.istio.io"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["argoproj.io"]
+  resources: ["*"]
+  verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: global-deployment-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: global-deployment-manager
+subjects:
+- kind: ServiceAccount
+  name: global-deployment-manager
+  namespace: neuromorphic-system

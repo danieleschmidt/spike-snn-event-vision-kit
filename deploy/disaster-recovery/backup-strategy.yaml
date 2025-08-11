@@ -1,0 +1,916 @@
+# =====================================================================================
+# DISASTER RECOVERY AND BACKUP STRATEGY
+# =====================================================================================
+# Comprehensive disaster recovery and backup strategy for neuromorphic vision
+# processing system with automated backup, cross-region replication, and recovery.
+# =====================================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: disaster-recovery-config
+  namespace: neuromorphic-system
+  labels:
+    component: disaster-recovery
+    tier: infrastructure
+data:
+  backup-strategy.yaml: |
+    # Disaster Recovery and Backup Configuration
+    disaster_recovery:
+      # Recovery objectives
+      objectives:
+        rpo: "1h"    # Recovery Point Objective - max data loss
+        rto: "4h"    # Recovery Time Objective - max downtime
+        mttr: "2h"   # Mean Time to Repair
+        mtbf: "720h" # Mean Time Between Failures (30 days)
+      
+      # Backup strategy
+      backup:
+        # Database backups
+        database:
+          type: "postgresql"
+          method: "continuous_archiving"
+          
+          # Full backups
+          full_backup:
+            schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+            retention: "12w"       # Keep 12 weeks of full backups
+            compression: "gzip"
+            encryption: "aes256"
+            
+            # Storage locations
+            primary_storage:
+              type: "s3"
+              bucket: "neuromorphic-backups-primary"
+              region: "us-west-2"
+              storage_class: "STANDARD_IA"
+            
+            secondary_storage:
+              type: "s3"
+              bucket: "neuromorphic-backups-secondary"
+              region: "us-east-1"
+              storage_class: "GLACIER"
+            
+            tertiary_storage:
+              type: "s3"
+              bucket: "neuromorphic-backups-tertiary"
+              region: "eu-west-1"
+              storage_class: "DEEP_ARCHIVE"
+          
+          # Incremental backups
+          incremental_backup:
+            schedule: "0 */6 * * *"  # Every 6 hours
+            retention: "7d"          # Keep 7 days of incrementals
+            compression: "zstd"
+            encryption: "aes256"
+            
+            storage:
+              type: "s3"
+              bucket: "neuromorphic-backups-incremental"
+              region: "us-west-2"
+              storage_class: "STANDARD"
+          
+          # Transaction log backup (WAL)
+          wal_backup:
+            method: "continuous_streaming"
+            archive_command: "s3-wal-push"
+            archive_timeout: "60s"
+            
+            storage:
+              type: "s3"
+              bucket: "neuromorphic-wal-archive"
+              region: "us-west-2"
+              storage_class: "STANDARD"
+            
+            # Cross-region WAL replication
+            replication:
+              enabled: true
+              target_regions: ["us-east-1", "eu-west-1"]
+              async_replication: true
+          
+          # Point-in-time recovery
+          pitr:
+            enabled: true
+            retention: "30d"
+            granularity: "1s"
+        
+        # Application data backups
+        application_data:
+          # Model files
+          models:
+            backup_method: "versioned_sync"
+            schedule: "0 4 * * *"  # Daily at 4 AM
+            retention: "90d"
+            
+            versioning:
+              enabled: true
+              max_versions: 10
+              cleanup_policy: "lru"
+            
+            storage:
+              primary:
+                type: "s3"
+                bucket: "neuromorphic-models-backup"
+                region: "us-west-2"
+              
+              secondary:
+                type: "s3"
+                bucket: "neuromorphic-models-backup-replica"
+                region: "us-east-1"
+          
+          # Configuration data
+          configurations:
+            backup_method: "snapshot"
+            schedule: "0 3 * * *"  # Daily at 3 AM
+            retention: "30d"
+            
+            storage:
+              type: "s3"
+              bucket: "neuromorphic-config-backup"
+              region: "us-west-2"
+              versioning: true
+          
+          # Logs and metrics
+          logs:
+            backup_method: "rolling_archive"
+            schedule: "0 1 * * *"  # Daily at 1 AM
+            retention: "1y"
+            compression: "lz4"
+            
+            storage:
+              type: "s3"
+              bucket: "neuromorphic-logs-archive"
+              region: "us-west-2"
+              storage_class: "GLACIER"
+            
+            # Long-term archival
+            archival:
+              enabled: true
+              threshold: "90d"
+              storage_class: "DEEP_ARCHIVE"
+        
+        # Kubernetes cluster backups
+        kubernetes:
+          # etcd backups
+          etcd:
+            backup_method: "snapshot"
+            schedule: "0 */4 * * *"  # Every 4 hours
+            retention: "7d"
+            
+            storage:
+              type: "s3"
+              bucket: "neuromorphic-etcd-backup"
+              region: "us-west-2"
+              encryption: true
+          
+          # Resource manifests
+          manifests:
+            backup_method: "git_sync"
+            repository: "git@github.com:neuromorphic/k8s-manifests-backup.git"
+            branch: "backup-main"
+            schedule: "0 */2 * * *"  # Every 2 hours
+          
+          # Persistent volumes
+          volumes:
+            backup_method: "csi_snapshots"
+            schedule: "0 5 * * *"  # Daily at 5 AM
+            retention: "14d"
+            
+            snapshot_class: "csi-aws-vsc"
+            cross_region_copy: true
+            target_regions: ["us-east-1"]
+      
+      # Disaster recovery procedures
+      recovery:
+        # Automated failover
+        automated_failover:
+          enabled: true
+          
+          # Trigger conditions
+          triggers:
+            - name: "primary_region_unavailable"
+              condition: "health_check_failures > 3 AND duration > 5m"
+              action: "promote_secondary_region"
+              priority: 1
+            
+            - name: "database_unavailable"
+              condition: "database_connection_failures > 5 AND duration > 2m"
+              action: "failover_to_replica"
+              priority: 2
+            
+            - name: "application_unresponsive"
+              condition: "response_time > 10s AND error_rate > 50% AND duration > 3m"
+              action: "restart_application"
+              priority: 3
+          
+          # Failover sequence
+          failover_sequence:
+            - step: 1
+              action: "assess_damage"
+              timeout: "2m"
+              
+            - step: 2
+              action: "promote_secondary_database"
+              timeout: "5m"
+              
+            - step: 3
+              action: "redirect_traffic"
+              timeout: "3m"
+              
+            - step: 4
+              action: "validate_functionality"
+              timeout: "5m"
+              
+            - step: 5
+              action: "notify_stakeholders"
+              timeout: "1m"
+        
+        # Manual recovery procedures
+        manual_recovery:
+          # Database recovery
+          database_recovery:
+            - procedure: "point_in_time_recovery"
+              steps:
+                - "Stop application connections"
+                - "Restore base backup"
+                - "Apply WAL files up to recovery point"
+                - "Start database in recovery mode"
+                - "Validate data integrity"
+                - "Promote to primary"
+                - "Update application connection strings"
+              
+              estimated_time: "2h"
+              rollback_plan: "Revert to previous backup"
+            
+            - procedure: "cross_region_recovery"
+              steps:
+                - "Assess primary region status"
+                - "Promote secondary region database"
+                - "Update DNS records"
+                - "Redirect application traffic"
+                - "Validate cross-region connectivity"
+                - "Monitor replication lag"
+              
+              estimated_time: "1h"
+              rollback_plan: "Revert DNS changes"
+          
+          # Application recovery
+          application_recovery:
+            - procedure: "container_recovery"
+              steps:
+                - "Pull latest backup container images"
+                - "Deploy to secondary cluster"
+                - "Restore configuration from backup"
+                - "Validate application startup"
+                - "Run smoke tests"
+                - "Update load balancer targets"
+              
+              estimated_time: "30m"
+              rollback_plan: "Revert to previous deployment"
+            
+            - procedure: "data_recovery"
+              steps:
+                - "Identify affected data sets"
+                - "Restore from most recent backup"
+                - "Replay incremental changes"
+                - "Validate data consistency"
+                - "Update application data sources"
+              
+              estimated_time: "1h"
+              rollback_plan: "Restore from earlier backup"
+        
+        # Recovery validation
+        validation:
+          # Automated tests
+          automated_tests:
+            - name: "database_connectivity"
+              command: "pg_isready -h ${DATABASE_HOST} -p 5432"
+              timeout: "30s"
+              retry_count: 3
+            
+            - name: "application_health"
+              command: "curl -f ${APPLICATION_URL}/health"
+              timeout: "10s"
+              retry_count: 5
+            
+            - name: "api_functionality"
+              command: "pytest tests/integration/test_api.py"
+              timeout: "5m"
+              retry_count: 1
+            
+            - name: "model_inference"
+              command: "python scripts/test_inference.py"
+              timeout: "2m"
+              retry_count: 1
+          
+          # Manual validation checklist
+          manual_checklist:
+            - "Verify all services are running"
+            - "Check application logs for errors"
+            - "Test user authentication"
+            - "Validate model inference results"
+            - "Confirm monitoring and alerting"
+            - "Test data consistency"
+            - "Verify backup jobs are running"
+            - "Check cross-region replication"
+      
+      # Monitoring and alerting
+      monitoring:
+        # Backup monitoring
+        backup_monitoring:
+          metrics:
+            - name: "backup_success_rate"
+              query: "backup_jobs_success_total / backup_jobs_total"
+              threshold: "> 0.95"
+              severity: "warning"
+            
+            - name: "backup_duration"
+              query: "backup_duration_seconds"
+              threshold: "< 3600"  # 1 hour
+              severity: "warning"
+            
+            - name: "backup_size_growth"
+              query: "rate(backup_size_bytes[1d])"
+              threshold: "< 1.2"    # 20% daily growth
+              severity: "info"
+            
+            - name: "restore_test_success"
+              query: "restore_test_success"
+              threshold: "== 1"
+              severity: "critical"
+          
+          alerts:
+            - name: "BackupFailed"
+              condition: "backup_jobs_failed_total > 0"
+              severity: "critical"
+              notification_channels: ["pagerduty", "slack", "email"]
+            
+            - name: "BackupDelayed"
+              condition: "time() - backup_last_success_timestamp > 86400"
+              severity: "warning"
+              notification_channels: ["slack", "email"]
+            
+            - name: "RestoreTestFailed"
+              condition: "restore_test_last_success < 1"
+              severity: "critical"
+              notification_channels: ["pagerduty", "slack"]
+        
+        # Recovery monitoring
+        recovery_monitoring:
+          metrics:
+            - name: "recovery_readiness"
+              query: "recovery_components_ready / recovery_components_total"
+              threshold: "> 0.95"
+              severity: "warning"
+            
+            - name: "cross_region_latency"
+              query: "cross_region_replication_lag_seconds"
+              threshold: "< 300"    # 5 minutes
+              severity: "warning"
+            
+            - name: "failover_capability"
+              query: "failover_test_success"
+              threshold: "== 1"
+              severity: "critical"
+          
+          alerts:
+            - name: "RecoveryNotReady"
+              condition: "recovery_readiness < 0.9"
+              severity: "critical"
+              notification_channels: ["pagerduty", "slack"]
+            
+            - name: "ReplicationLagHigh"
+              condition: "cross_region_replication_lag_seconds > 600"
+              severity: "warning"
+              notification_channels: ["slack", "email"]
+      
+      # Testing and validation
+      testing:
+        # Regular DR tests
+        disaster_recovery_tests:
+          # Monthly full DR test
+          full_test:
+            schedule: "0 2 1 * *"  # First day of month at 2 AM
+            duration: "4h"
+            
+            procedures:
+              - "Simulate primary region failure"
+              - "Execute automated failover"
+              - "Validate secondary region operation"
+              - "Test application functionality"
+              - "Measure recovery time"
+              - "Document lessons learned"
+            
+            success_criteria:
+              - "RTO < 4h"
+              - "RPO < 1h"
+              - "All critical functions operational"
+              - "Data consistency validated"
+          
+          # Weekly backup restore test
+          restore_test:
+            schedule: "0 3 * * 6"  # Saturday at 3 AM
+            duration: "2h"
+            
+            procedures:
+              - "Select random backup from past week"
+              - "Restore to isolated environment"
+              - "Validate data integrity"
+              - "Test application startup"
+              - "Compare with production data"
+            
+            success_criteria:
+              - "Restore completes successfully"
+              - "Data integrity checks pass"
+              - "Application functions normally"
+          
+          # Quarterly chaos engineering
+          chaos_test:
+            schedule: "0 4 1 */3 *"  # Quarterly
+            duration: "6h"
+            
+            scenarios:
+              - "Random pod termination"
+              - "Network partition simulation"
+              - "Database connection failures"
+              - "Storage volume failures"
+              - "DNS resolution failures"
+            
+            success_criteria:
+              - "System recovers automatically"
+              - "No data loss occurs"
+              - "User impact minimized"
+              - "Monitoring alerts appropriately"
+        
+        # Backup validation
+        backup_validation:
+          # Daily backup integrity checks
+          integrity_checks:
+            schedule: "0 6 * * *"  # Daily at 6 AM
+            
+            checks:
+              - "Verify backup file checksums"
+              - "Test backup file accessibility"
+              - "Validate backup metadata"
+              - "Check encryption integrity"
+              - "Confirm cross-region replication"
+          
+          # Weekly restore validation
+          restore_validation:
+            schedule: "0 7 * * 0"  # Sunday at 7 AM
+            
+            validation:
+              - "Restore latest full backup"
+              - "Apply recent incremental backups"
+              - "Verify database consistency"
+              - "Test application compatibility"
+              - "Measure restore performance"
+      
+      # Documentation and procedures
+      documentation:
+        # Runbooks
+        runbooks:
+          - name: "Database Failure Recovery"
+            location: "https://docs.neuromorphic.production.com/runbooks/db-recovery"
+            last_updated: "2023-10-01"
+            owner: "database-team"
+          
+          - name: "Application Disaster Recovery"
+            location: "https://docs.neuromorphic.production.com/runbooks/app-recovery"
+            last_updated: "2023-10-01"
+            owner: "platform-team"
+          
+          - name: "Cross-Region Failover"
+            location: "https://docs.neuromorphic.production.com/runbooks/region-failover"
+            last_updated: "2023-10-01"
+            owner: "infrastructure-team"
+        
+        # Contact information
+        contacts:
+          primary_oncall:
+            name: "Platform Team"
+            phone: "+1-555-PLATFORM"
+            email: "platform-oncall@neuromorphic.production.com"
+            pagerduty: "platform-oncall"
+          
+          secondary_oncall:
+            name: "Database Team"
+            phone: "+1-555-DATABASE"
+            email: "database-oncall@neuromorphic.production.com"
+            pagerduty: "database-oncall"
+          
+          management_escalation:
+            name: "VP Engineering"
+            phone: "+1-555-VP-ENG"
+            email: "vp-engineering@neuromorphic.production.com"
+        
+        # Communication plan
+        communication:
+          internal:
+            - channel: "#incident-response"
+              purpose: "Real-time incident coordination"
+            - channel: "#platform-alerts"
+              purpose: "Automated alert notifications"
+            - email: "engineering-all@neuromorphic.production.com"
+              purpose: "Incident updates and post-mortems"
+          
+          external:
+            - channel: "status.neuromorphic.production.com"
+              purpose: "Customer-facing status updates"
+            - email: "customers@neuromorphic.production.com"
+              purpose: "Incident notifications to customers"
+            - twitter: "@neuromorphic_ops"
+              purpose: "Public incident communications"
+
+---
+# Backup CronJob for Database
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: neuromorphic-vision
+  labels:
+    app: postgres-backup
+    component: disaster-recovery
+spec:
+  schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM UTC
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: postgres-backup
+            component: disaster-recovery
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: postgres-backup
+          
+          containers:
+          - name: postgres-backup
+            image: postgres:15-alpine
+            imagePullPolicy: IfNotPresent
+            
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Environment variables
+              export BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+              export BACKUP_FILE="neuromorphic_backup_${BACKUP_DATE}.sql.gz"
+              export PGPASSWORD="${DATABASE_PASSWORD}"
+              
+              echo "Starting database backup: ${BACKUP_FILE}"
+              
+              # Create backup with compression
+              pg_dump \
+                -h "${DATABASE_HOST}" \
+                -p "${DATABASE_PORT}" \
+                -U "${DATABASE_USER}" \
+                -d "${DATABASE_NAME}" \
+                --verbose \
+                --no-password \
+                --format=custom \
+                --compress=9 \
+                --no-privileges \
+                --no-owner | \
+              gzip > "/tmp/${BACKUP_FILE}"
+              
+              echo "Backup created, size: $(du -h /tmp/${BACKUP_FILE} | cut -f1)"
+              
+              # Upload to S3
+              aws s3 cp "/tmp/${BACKUP_FILE}" "s3://${BACKUP_BUCKET}/database/full/${BACKUP_FILE}" \
+                --storage-class STANDARD_IA \
+                --server-side-encryption AES256
+              
+              # Cross-region replication
+              aws s3 cp "s3://${BACKUP_BUCKET}/database/full/${BACKUP_FILE}" \
+                "s3://${BACKUP_BUCKET_REPLICA}/database/full/${BACKUP_FILE}" \
+                --source-region us-west-2 \
+                --region us-east-1 \
+                --storage-class GLACIER
+              
+              # Cleanup old local files
+              rm -f "/tmp/${BACKUP_FILE}"
+              
+              echo "Database backup completed successfully"
+              
+              # Update backup metrics
+              curl -X POST "http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/postgres-backup" \
+                -d "postgres_backup_success{job=\"postgres-backup\"} 1"
+              
+              curl -X POST "http://pushgateway.monitoring.svc.cluster.local:9091/metrics/job/postgres-backup" \
+                -d "postgres_backup_timestamp{job=\"postgres-backup\"} $(date +%s)"
+            
+            env:
+            - name: DATABASE_HOST
+              value: "postgresql.neuromorphic-vision.svc.cluster.local"
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_NAME
+              value: "neuromorphic"
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: BACKUP_BUCKET
+              value: "neuromorphic-backups-primary"
+            - name: BACKUP_BUCKET_REPLICA
+              value: "neuromorphic-backups-secondary"
+            - name: AWS_DEFAULT_REGION
+              value: "us-west-2"
+            
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+            
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 999
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            
+            volumeMounts:
+            - name: temp-storage
+              mountPath: /tmp
+          
+          volumes:
+          - name: temp-storage
+            emptyDir:
+              sizeLimit: 10Gi
+          
+          # Node selection for backup jobs
+          nodeSelector:
+            workload-type: system
+          
+          tolerations:
+          - key: node-role.kubernetes.io/system
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+
+---
+# Incremental Backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-incremental-backup
+  namespace: neuromorphic-vision
+  labels:
+    app: postgres-incremental-backup
+    component: disaster-recovery
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: postgres-incremental-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: postgres-backup
+          
+          containers:
+          - name: incremental-backup
+            image: postgres:15-alpine
+            imagePullPolicy: IfNotPresent
+            
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Environment variables
+              export BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+              export INCREMENTAL_FILE="neuromorphic_incremental_${BACKUP_DATE}.tar.zst"
+              
+              echo "Starting incremental backup: ${INCREMENTAL_FILE}"
+              
+              # Get WAL files since last backup
+              LAST_BACKUP_LSN=$(aws s3api head-object \
+                --bucket "${BACKUP_BUCKET}" \
+                --key "database/metadata/last_backup_lsn" \
+                --query 'Metadata.lsn' --output text 2>/dev/null || echo "")
+              
+              if [ -z "${LAST_BACKUP_LSN}" ]; then
+                echo "No previous backup LSN found, skipping incremental backup"
+                exit 0
+              fi
+              
+              # Create incremental backup using pg_waldump
+              pg_waldump --start="${LAST_BACKUP_LSN}" \
+                /var/lib/postgresql/data/pg_wal/* | \
+              zstd -3 > "/tmp/${INCREMENTAL_FILE}"
+              
+              # Upload to S3
+              aws s3 cp "/tmp/${INCREMENTAL_FILE}" \
+                "s3://${BACKUP_BUCKET}/database/incremental/${INCREMENTAL_FILE}" \
+                --storage-class STANDARD
+              
+              # Update LSN metadata
+              CURRENT_LSN=$(psql -h "${DATABASE_HOST}" -U "${DATABASE_USER}" -d "${DATABASE_NAME}" \
+                -t -c "SELECT pg_current_wal_lsn();" | xargs)
+              
+              aws s3api put-object \
+                --bucket "${BACKUP_BUCKET}" \
+                --key "database/metadata/last_backup_lsn" \
+                --body /dev/null \
+                --metadata "lsn=${CURRENT_LSN}"
+              
+              # Cleanup
+              rm -f "/tmp/${INCREMENTAL_FILE}"
+              
+              echo "Incremental backup completed successfully"
+            
+            env:
+            - name: DATABASE_HOST
+              value: "postgresql.neuromorphic-vision.svc.cluster.local"
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: DATABASE_NAME
+              value: "neuromorphic"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: BACKUP_BUCKET
+              value: "neuromorphic-backups-primary"
+            
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+            
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 999
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+            
+            volumeMounts:
+            - name: temp-storage
+              mountPath: /tmp
+          
+          volumes:
+          - name: temp-storage
+            emptyDir:
+              sizeLimit: 5Gi
+
+---
+# Disaster Recovery Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-backup
+  namespace: neuromorphic-vision
+  labels:
+    component: disaster-recovery
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/neuromorphic-backup-role"
+automountServiceAccountToken: true
+
+---
+# Backup RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: postgres-backup
+  namespace: neuromorphic-vision
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+  resourceNames: ["postgres-credentials"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: postgres-backup
+  namespace: neuromorphic-vision
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: postgres-backup
+subjects:
+- kind: ServiceAccount
+  name: postgres-backup
+  namespace: neuromorphic-vision
+
+---
+# Disaster Recovery Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: disaster-recovery-metrics
+  namespace: neuromorphic-vision
+  labels:
+    component: disaster-recovery
+spec:
+  selector:
+    matchLabels:
+      component: disaster-recovery
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true
+
+---
+# Prometheus Rules for DR Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: disaster-recovery-alerts
+  namespace: neuromorphic-vision
+  labels:
+    component: disaster-recovery
+spec:
+  groups:
+  - name: disaster_recovery
+    interval: 30s
+    rules:
+    # Backup failure alerts
+    - alert: BackupJobFailed
+      expr: kube_job_status_failed{job_name=~"postgres.*backup.*"} > 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Database backup job failed"
+        description: "Backup job {{ $labels.job_name }} has failed. Check logs immediately."
+    
+    - alert: BackupJobMissing
+      expr: (time() - kube_job_status_completion_time{job_name=~"postgres-backup"}) > 86400
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Database backup job hasn't run in 24 hours"
+        description: "No successful backup in the last 24 hours. Check backup schedule and job status."
+    
+    # Replication lag alerts
+    - alert: DatabaseReplicationLag
+      expr: postgres_replication_lag_seconds > 300
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High database replication lag"
+        description: "Database replication lag is {{ $value }} seconds, above 5 minute threshold."
+    
+    # Recovery readiness alerts
+    - alert: DisasterRecoveryNotReady
+      expr: disaster_recovery_readiness < 0.9
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Disaster recovery system not ready"
+        description: "DR readiness is {{ $value | humanizePercentage }}, below 90% threshold."
+    
+    # Cross-region connectivity
+    - alert: CrossRegionConnectivityLoss
+      expr: cross_region_connectivity_status == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Lost connectivity to secondary region"
+        description: "Cannot reach secondary region {{ $labels.region }}. Failover capability compromised."

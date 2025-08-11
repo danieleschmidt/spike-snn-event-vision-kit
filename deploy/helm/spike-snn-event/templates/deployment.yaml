@@ -1,0 +1,381 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "spike-snn-event.fullname" . }}
+  labels:
+    {{- include "spike-snn-event.labels" . | nindent 4 }}
+    {{- with .Values.global.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- with .Values.global.commonAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "spike-snn-event.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.deploymentStrategy.maxSurge | default "25%" }}
+      maxUnavailable: {{ .Values.deploymentStrategy.maxUnavailable | default "25%" }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.commonAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "spike-snn-event.selectorLabels" . | nindent 8 }}
+        {{- with .Values.global.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        version: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "spike-snn-event.serviceAccountName" . }}
+      
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.global.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      # Init containers
+      {{- if .Values.initContainers }}
+      initContainers:
+        {{- range .Values.initContainers }}
+        - name: {{ .name }}
+          image: {{ .image }}
+          {{- if .command }}
+          command:
+            {{- toYaml .command | nindent 12 }}
+          {{- end }}
+          {{- if .args }}
+          args:
+            {{- toYaml .args | nindent 12 }}
+          {{- end }}
+          {{- if .env }}
+          env:
+            {{- toYaml .env | nindent 12 }}
+          {{- end }}
+          {{- if .volumeMounts }}
+          volumeMounts:
+            {{- toYaml .volumeMounts | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      
+      containers:
+        # Main application container
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort | default 8000 }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.service.metricsPort | default 9090 }}
+              protocol: TCP
+            {{- if .Values.app.container.healthPort }}
+            - name: health
+              containerPort: {{ .Values.app.container.healthPort }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.additionalPorts }}
+            {{- range .Values.additionalPorts }}
+            - name: {{ .name }}
+              containerPort: {{ .containerPort }}
+              protocol: {{ .protocol | default "TCP" }}
+            {{- end }}
+            {{- end }}
+          
+          # Environment variables
+          env:
+            {{- if .Values.env }}
+            {{- toYaml .Values.env | nindent 12 }}
+            {{- end }}
+            # Application metadata
+            - name: APP_NAME
+              value: {{ include "spike-snn-event.fullname" . }}
+            - name: APP_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          
+          # Environment variables from ConfigMap
+          {{- if .Values.configMapRefs }}
+          {{- range .Values.configMapRefs }}
+          envFrom:
+            - configMapRef:
+                name: {{ . }}
+          {{- end }}
+          {{- end }}
+          
+          # Environment variables from Secrets
+          {{- if .Values.secretRefs }}
+          {{- range .Values.secretRefs }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          {{- end }}
+          
+          # Resource limits and requests
+          {{- if .Values.resources }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          
+          # Volume mounts
+          volumeMounts:
+            {{- if .Values.persistence.enabled }}
+            - name: {{ include "spike-snn-event.fullname" . }}-storage
+              mountPath: {{ .Values.persistence.mountPath | default "/app/models" }}
+            {{- end }}
+            {{- if .Values.persistence.dataStorage.enabled }}
+            - name: {{ include "spike-snn-event.fullname" . }}-data-storage
+              mountPath: {{ .Values.persistence.dataStorage.mountPath | default "/app/data" }}
+            {{- end }}
+            {{- if .Values.persistence.logStorage.enabled }}
+            - name: {{ include "spike-snn-event.fullname" . }}-log-storage
+              mountPath: {{ .Values.persistence.logStorage.mountPath | default "/app/logs" }}
+            {{- end }}
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            {{- if .Values.additionalVolumeMounts }}
+            {{- toYaml .Values.additionalVolumeMounts | nindent 12 }}
+            {{- end }}
+          
+          # Health checks
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path | default "/health" }}
+              port: {{ .Values.probes.liveness.port | default "http" }}
+              {{- if .Values.probes.liveness.httpHeaders }}
+              httpHeaders:
+                {{- toYaml .Values.probes.liveness.httpHeaders | nindent 16 }}
+              {{- end }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds | default 60 }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds | default 30 }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds | default 10 }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold | default 3 }}
+            successThreshold: {{ .Values.probes.liveness.successThreshold | default 1 }}
+          {{- end }}
+          
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path | default "/ready" }}
+              port: {{ .Values.probes.readiness.port | default "http" }}
+              {{- if .Values.probes.readiness.httpHeaders }}
+              httpHeaders:
+                {{- toYaml .Values.probes.readiness.httpHeaders | nindent 16 }}
+              {{- end }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds | default 10 }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds | default 5 }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold | default 3 }}
+            successThreshold: {{ .Values.probes.readiness.successThreshold | default 1 }}
+          {{- end }}
+          
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path | default "/startup" }}
+              port: {{ .Values.probes.startup.port | default "http" }}
+              {{- if .Values.probes.startup.httpHeaders }}
+              httpHeaders:
+                {{- toYaml .Values.probes.startup.httpHeaders | nindent 16 }}
+              {{- end }}
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds | default 10 }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds | default 5 }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold | default 10 }}
+            successThreshold: {{ .Values.probes.startup.successThreshold | default 1 }}
+          {{- end }}
+          
+          # Lifecycle hooks
+          {{- if or .Values.lifecycle.preStop .Values.lifecycle.postStart }}
+          lifecycle:
+            {{- if .Values.lifecycle.preStop }}
+            preStop:
+              {{- if .Values.lifecycle.preStop.exec }}
+              exec:
+                command:
+                  {{- toYaml .Values.lifecycle.preStop.exec.command | nindent 18 }}
+              {{- end }}
+              {{- if .Values.lifecycle.preStop.httpGet }}
+              httpGet:
+                path: {{ .Values.lifecycle.preStop.httpGet.path }}
+                port: {{ .Values.lifecycle.preStop.httpGet.port }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.lifecycle.postStart }}
+            postStart:
+              {{- if .Values.lifecycle.postStart.exec }}
+              exec:
+                command:
+                  {{- toYaml .Values.lifecycle.postStart.exec.command | nindent 18 }}
+              {{- end }}
+              {{- if .Values.lifecycle.postStart.httpGet }}
+              httpGet:
+                path: {{ .Values.lifecycle.postStart.httpGet.path }}
+                port: {{ .Values.lifecycle.postStart.httpGet.port }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+        
+        # Sidecar containers
+        {{- if .Values.sidecars }}
+        {{- range .Values.sidecars }}
+        - name: {{ .name }}
+          image: {{ .image }}
+          {{- if .command }}
+          command:
+            {{- toYaml .command | nindent 12 }}
+          {{- end }}
+          {{- if .args }}
+          args:
+            {{- toYaml .args | nindent 12 }}
+          {{- end }}
+          {{- if .env }}
+          env:
+            {{- toYaml .env | nindent 12 }}
+          {{- end }}
+          {{- if .ports }}
+          ports:
+            {{- toYaml .ports | nindent 12 }}
+          {{- end }}
+          {{- if .resources }}
+          resources:
+            {{- toYaml .resources | nindent 12 }}
+          {{- end }}
+          {{- if .volumeMounts }}
+          volumeMounts:
+            {{- toYaml .volumeMounts | nindent 12 }}
+          {{- end }}
+          {{- if .securityContext }}
+          securityContext:
+            {{- toYaml .securityContext | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
+      
+      # Volumes
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "spike-snn-event.fullname" . }}-config
+            defaultMode: 0644
+        
+        {{- if .Values.persistence.enabled }}
+        - name: {{ include "spike-snn-event.fullname" . }}-storage
+          persistentVolumeClaim:
+            claimName: {{ include "spike-snn-event.fullname" . }}-pvc
+        {{- end }}
+        
+        {{- if .Values.persistence.dataStorage.enabled }}
+        - name: {{ include "spike-snn-event.fullname" . }}-data-storage
+          persistentVolumeClaim:
+            claimName: {{ include "spike-snn-event.fullname" . }}-data-pvc
+        {{- end }}
+        
+        {{- if .Values.persistence.logStorage.enabled }}
+        - name: {{ include "spike-snn-event.fullname" . }}-log-storage
+          persistentVolumeClaim:
+            claimName: {{ include "spike-snn-event.fullname" . }}-log-pvc
+        {{- end }}
+        
+        {{- if .Values.additionalVolumes }}
+        {{- toYaml .Values.additionalVolumes | nindent 8 }}
+        {{- end }}
+      
+      # Node selection and scheduling
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      # Priority and preemption
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      
+      # DNS configuration
+      {{- if .Values.dnsPolicy }}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      {{- end }}
+      
+      {{- if .Values.dnsConfig }}
+      dnsConfig:
+        {{- toYaml .Values.dnsConfig | nindent 8 }}
+      {{- end }}
+      
+      # Host configuration
+      {{- if .Values.hostNetwork }}
+      hostNetwork: {{ .Values.hostNetwork }}
+      {{- end }}
+      
+      {{- if .Values.hostPID }}
+      hostPID: {{ .Values.hostPID }}
+      {{- end }}
+      
+      # Termination settings
+      {{- if .Values.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- end }}
+      
+      # Runtime class
+      {{- if .Values.runtimeClassName }}
+      runtimeClassName: {{ .Values.runtimeClassName }}
+      {{- end }}

@@ -22,7 +22,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 
-from .validation import ValidationError, SpikeNNError
+from .validation import ValidationError, SpikeNNError, DataIntegrityError
 
 
 class SecurityError(SpikeNNError):
