@@ -4,7 +4,7 @@
   "tests_passed": 3,
   "tests_total": 4,
   "success_rate": 0.75,
-  "runtime_seconds": 1.1323654651641846,
+  "runtime_seconds": 1.2586781978607178,
   "achievements": [
     "asynchronous_processing",
     "intelligent_caching",
@@ -17,7 +17,7 @@
   ],
   "performance_metrics": {
     "total_events_processed": 10000,
-    "aggregate_throughput_eps": 45549.266529688495,
+    "aggregate_throughput_eps": 27311.912118538392,
     "overall_cache_hit_rate": 0.25,
     "peak_memory_efficiency": 0
   },
@@ -25,8 +25,8 @@
     "async_processing": {
       "success": true,
       "total_events_processed": 10000,
-      "total_processing_time_sec": 0.2195425033569336,
-      "average_throughput_eps": 45549.266529688495,
+      "total_processing_time_sec": 0.36614060401916504,
+      "average_throughput_eps": 27311.912118538392,
       "batches_processed": 5,
       "cache_stats": {
         "hit_count": 1,
@@ -38,13 +38,13 @@
         "ttl_seconds": 600,
         "auto_resize_enabled": true
       },
-      "cache_speedup_factor": 324.21762589928056,
+      "cache_speedup_factor": 717.28125,
       "async_processor_stats": {
         "events_processed": 10000,
         "batches_processed": 5,
-        "processing_time_total": 0.21867966651916504,
-        "average_batch_time": 0.043735933303833005,
-        "throughput_eps": 45728.988703774165,
+        "processing_time_total": 0.36521148681640625,
+        "average_batch_time": 0.07304229736328124,
+        "throughput_eps": 27381.395057344,
         "cache_hits": 1,
         "cache_misses": 5
       }
@@ -65,7 +65,7 @@
             "cpu_usage_percent": 20.0,
             "cache_hit_rate": 0.8400000000000001,
             "error_rate": 0.020000000000000004,
-            "uptime_seconds": 0.2671377658843994
+            "uptime_seconds": 0.41512060165405273
           }
         },
         {
@@ -81,7 +81,7 @@
             "cpu_usage_percent": 50.0,
             "cache_hit_rate": 0.75,
             "error_rate": 0.05,
-            "uptime_seconds": 0.36745786666870117
+            "uptime_seconds": 0.5156328678131104
           }
         },
         {
@@ -97,7 +97,7 @@
             "cpu_usage_percent": 90.0,
             "cache_hit_rate": 0.63,
             "error_rate": 0.09000000000000001,
-            "uptime_seconds": 0.4677703380584717
+            "uptime_seconds": 0.616065502166748
           }
         },
         {
@@ -113,7 +113,7 @@
             "cpu_usage_percent": 120.0,
             "cache_hit_rate": 0.54,
             "error_rate": 0.12,
-            "uptime_seconds": 0.5681788921356201
+            "uptime_seconds": 0.7164549827575684
           }
         },
         {
@@ -129,7 +129,7 @@
             "cpu_usage_percent": 60.0,
             "cache_hit_rate": 0.72,
             "error_rate": 0.06,
-            "uptime_seconds": 0.6686735153198242
+            "uptime_seconds": 0.8169474601745605
           }
         },
         {
@@ -145,7 +145,7 @@
             "cpu_usage_percent": 10.0,
             "cache_hit_rate": 0.87,
             "error_rate": 0.010000000000000002,
-            "uptime_seconds": 0.7693564891815186
+            "uptime_seconds": 0.9173455238342285
           }
         }
       ],
@@ -166,13 +166,12 @@
       "success": true,
       "input_events": 5749,
       "detections_found": 20,
-      "detection_time_ms": 39.07418251037598,
-      "detection_rate_dps": 511.8469207817486,
-      "cache_time_ms": 0.06699562072753906,
-      "cache_speedup_factor": 39.07418251037598,
+      "detection_time_ms": 29.420852661132812,
+      "detection_rate_dps": 679.7899513776337,
+      "cache_time_ms": 0.04887580871582031,
+      "cache_speedup_factor": 29.420852661132812,
       "detection_types": {
-        "linear": 1,
-        "cluster": 19
+        "cluster": 20
       },
       "average_confidence": 1.0,
       "high_confidence_detections": 20,

@@ -3,79 +3,79 @@
     "detections": [
       {
         "bbox": [
-          78.53273357082848,
-          49.91555322821015,
-          32.040110136600276,
-          25.225797206410938
+          74.66493830675097,
+          40.251257738207656,
+          26.8256013004341,
+          23.231425777637543
         ],
-        "confidence": 0.8077163361286683,
-        "class_id": 1,
+        "confidence": 0.8821618450761426,
+        "class_id": 0,
         "class_name": "person"
       },
       {
         "bbox": [
-          68.22012140986665,
-          36.916036025186386,
-          39.03647816456519,
-          21.62038650262697
+          38.34848694413469,
+          85.14956196941438,
+          23.341209034760848,
+          24.21754556091671
         ],
-        "confidence": 0.680328008936145,
-        "class_id": 1,
+        "confidence": 0.8689425627774823,
+        "class_id": 0,
         "class_name": "object"
       },
       {
         "bbox": [
-          95.4153163102456,
-          53.27433312758659,
-          35.52760862890338,
-          26.966638862411976
+          59.72067929475815,
+          83.30674771804614,
+          26.7763284074976,
+          32.026155585953745
         ],
-        "confidence": 0.7691268188599543,
+        "confidence": 0.7393802636296041,
         "class_id": 1,
-        "class_name": "vehicle"
+        "class_name": "person"
       }
     ],
-    "inference_time_ms": 1.1553764343261719,
-    "input_events": 1997,
-    "processing_rate": 1728441.0004127114
+    "inference_time_ms": 1.226186752319336,
+    "input_events": 1999,
+    "processing_rate": 1630257.3781839393
   },
   "performance": [
     {
       "input_size": 100,
-      "throughput": 87857.22664432343,
-      "latency_ms": 1.1382102966308594,
+      "throughput": 89051.04033970275,
+      "latency_ms": 1.1229515075683594,
       "detections": 0
     },
     {
       "input_size": 500,
-      "throughput": 430980.6822852446,
-      "latency_ms": 1.1601448059082031,
+      "throughput": 439010.2574837764,
+      "latency_ms": 1.138925552368164,
       "detections": 2
     },
     {
       "input_size": 1000,
-      "throughput": 790930.4167452386,
-      "latency_ms": 1.264333724975586,
+      "throughput": 835851.7337584695,
+      "latency_ms": 1.1963844299316406,
       "detections": 3
     },
     {
       "input_size": 5000,
-      "throughput": 4269446.254071661,
-      "latency_ms": 1.171112060546875,
+      "throughput": 4051684.6986089647,
+      "latency_ms": 1.2340545654296875,
       "detections": 3
     },
     {
       "input_size": 10000,
-      "throughput": 8616072.30895645,
-      "latency_ms": 1.1606216430664062,
+      "throughput": 8208031.311154598,
+      "latency_ms": 1.2183189392089844,
       "detections": 3
     }
   ],
   "robustness_score": 100.0,
   "overall_status": "\u2705 PRODUCTION READY",
   "summary": {
-    "max_throughput": 8616072.30895645,
-    "avg_latency": 1.178884506225586,
+    "max_throughput": 8208031.311154598,
+    "avg_latency": 1.1821269989013672,
     "robustness_score": 100.0
   }
 }
