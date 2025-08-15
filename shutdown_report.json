@@ -1,0 +1,83 @@
+{
+  "system_health": {
+    "current_metrics": {
+      "timestamp": 1755218332.4828606,
+      "cpu_usage": 14.08201947288568,
+      "memory_usage": 32.46977360242661,
+      "events_processed": 33,
+      "errors_count": 0,
+      "latency_p95": 176.01122856140128,
+      "throughput_eps": 6.560626891141312,
+      "active_connections": 0,
+      "health_status": "healthy"
+    },
+    "health_checks": {
+      "memory_usage": true,
+      "disk_space": true,
+      "response_time": "True"
+    },
+    "trends": {
+      "cpu_trend": 14.08201947288568,
+      "memory_trend": 32.46977360242661
+    },
+    "overall_status": "healthy",
+    "metrics_count": 1
+  },
+  "security_audit": {
+    "total_events": 66,
+    "event_types": {
+      "INPUT_VALIDATED": 66
+    },
+    "latest_events": [
+      {
+        "timestamp": 1755218331.5851607,
+        "event_type": "INPUT_VALIDATED",
+        "source": "heavy_load",
+        "details": "Input validation passed",
+        "hash": "400437eb260aba29"
+      },
+      {
+        "timestamp": 1755218331.8369222,
+        "event_type": "INPUT_VALIDATED",
+        "source": "burst_load",
+        "details": "Input validation passed",
+        "hash": "19a242048f519d1c"
+      },
+      {
+        "timestamp": 1755218331.8374424,
+        "event_type": "INPUT_VALIDATED",
+        "source": "burst_load",
+        "details": "Input validation passed",
+        "hash": "19a242048f519d1c"
+      },
+      {
+        "timestamp": 1755218332.1673758,
+        "event_type": "INPUT_VALIDATED",
+        "source": "burst_load",
+        "details": "Input validation passed",
+        "hash": "19a242048f519d1c"
+      },
+      {
+        "timestamp": 1755218332.1679482,
+        "event_type": "INPUT_VALIDATED",
+        "source": "burst_load",
+        "details": "Input validation passed",
+        "hash": "19a242048f519d1c"
+      }
+    ]
+  },
+  "processing_stats": {
+    "events_processed": 33,
+    "errors_encountered": 0,
+    "recovery_attempts": 0,
+    "start_time": 1755218327.4528277
+  },
+  "error_recovery": {
+    "total_recoveries": 0,
+    "successful_recoveries": 0,
+    "failed_recoveries": 0,
+    "success_rate": 0.0,
+    "error_patterns": {}
+  },
+  "uptime": 5.030158519744873
+}

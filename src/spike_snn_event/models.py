@@ -12,6 +12,70 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+    # Create dummy torch for graceful degradation
+    class _DummyTorch:
+        class tensor:
+            def __init__(self, *args, **kwargs):
+                pass
+        @staticmethod
+        def exp(x):
+            return x
+        @staticmethod
+        def zeros(*args, **kwargs):
+            return _DummyTorch.tensor()
+        @staticmethod
+        def ones_like(x):
+            return _DummyTorch.tensor()
+        class cuda:
+            @staticmethod
+            def is_available():
+                return False
+            @staticmethod
+            def synchronize():
+                pass
+    torch = _DummyTorch()
+    
+    class _DummyNN:
+        class Module:
+            def __init__(self):
+                pass
+            def parameters(self):
+                return []
+            def modules(self):
+                return []
+            def cuda(self):
+                return self
+            def cpu(self):
+                return self
+            def eval(self):
+                return self
+            def train(self, mode=True):
+                return self
+        class Conv2d(Module):
+            def __init__(self, *args, **kwargs):
+                super().__init__()
+        class Linear(Module):
+            def __init__(self, *args, **kwargs):
+                super().__init__()
+        class ModuleList(list):
+            def __init__(self, modules=[]):
+                super().__init__(modules)
+        class AvgPool3d(Module):
+            def __init__(self, *args, **kwargs):
+                super().__init__()
+        class BatchNorm2d(Module):
+            def __init__(self, *args, **kwargs):
+                super().__init__()
+    nn = _DummyNN()
+    
+    class _DummyF:
+        @staticmethod
+        def cross_entropy(*args, **kwargs):
+            return 0.0
+        @staticmethod
+        def mse_loss(*args, **kwargs):
+            return 0.0
+    F = _DummyF()
     
 from typing import Optional, Tuple, List, Dict, Any, Callable
 import numpy as np

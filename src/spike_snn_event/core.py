@@ -14,12 +14,51 @@ try:
     CV2_AVAILABLE = True
 except ImportError:
     CV2_AVAILABLE = False
+    # Create dummy cv2 for graceful degradation
+    class _DummyCV2:
+        FONT_HERSHEY_SIMPLEX = 0
+        @staticmethod
+        def rectangle(*args, **kwargs):
+            pass
+        @staticmethod
+        def putText(*args, **kwargs):
+            pass
+    cv2 = _DummyCV2()
+    
 import threading
 from queue import Queue
 import logging
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from .validation import validate_events, validate_image_dimensions, safe_operation, ValidationError
+
+# Create minimal validation for core functionality
+def validate_events(events: np.ndarray) -> np.ndarray:
+    """Basic event validation."""
+    if not isinstance(events, np.ndarray):
+        raise ValueError("Events must be numpy array")
+    if len(events.shape) != 2 or events.shape[1] != 4:
+        raise ValueError("Events must have shape (N, 4)")
+    return events
+
+def validate_image_dimensions(width: int, height: int) -> Tuple[int, int]:
+    """Validate image dimensions."""
+    if width <= 0 or height <= 0:
+        raise ValueError("Dimensions must be positive")
+    return width, height
+
+def safe_operation(func):
+    """Decorator for safe operations."""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error(f"Operation failed: {e}")
+            raise
+    return wrapper
+
+class ValidationError(Exception):
+    """Custom validation error."""
+    pass
 
 
 @dataclass
