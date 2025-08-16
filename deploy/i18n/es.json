@@ -1,0 +1,10 @@
+{
+  "app.title": "Procesamiento de Visión Neuromórfica",
+  "events.processing": "Procesando eventos",
+  "camera.connected": "Cámara conectada",
+  "camera.disconnected": "Cámara desconectada",
+  "error.processing": "Error de procesamiento ocurrió",
+  "success.detection": "Detección de objeto exitosa",
+  "status.healthy": "Sistema saludable",
+  "status.degraded": "Rendimiento del sistema degradado"
+}

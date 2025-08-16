@@ -1,0 +1,108 @@
+{
+  "status": "PASSED",
+  "overall_score": 92.85714285714286,
+  "total_tests": 14,
+  "passed_tests": 13,
+  "failed_tests": 1,
+  "execution_time": 12.82587194442749,
+  "details": [
+    {
+      "name": "DVS Camera Initialization",
+      "passed": true,
+      "details": "Basic camera setup working",
+      "duration": 0.10230779647827148,
+      "timestamp": 1755349367.6231196
+    },
+    {
+      "name": "Event Generation",
+      "passed": true,
+      "details": "Generated 0 valid events",
+      "duration": 0.012284994125366211,
+      "timestamp": 1755349367.6354122
+    },
+    {
+      "name": "Noise Filtering",
+      "passed": true,
+      "details": "Filtered 3 to 2 events",
+      "duration": 6.413459777832031e-05,
+      "timestamp": 1755349367.6354816
+    },
+    {
+      "name": "Input Validation",
+      "passed": false,
+      "details": "Error: Valid events failed validation: Rate limit exceeded",
+      "duration": 0.004814624786376953,
+      "timestamp": 1755349367.6403313
+    },
+    {
+      "name": "Circuit Breaker",
+      "passed": true,
+      "details": "Circuit breaker functioning correctly",
+      "duration": 0.00017261505126953125,
+      "timestamp": 1755349367.640508
+    },
+    {
+      "name": "System Monitoring",
+      "passed": true,
+      "details": "Monitoring system operational",
+      "duration": 0.20183205604553223,
+      "timestamp": 1755349367.8423896
+    },
+    {
+      "name": "Intelligent Cache",
+      "passed": true,
+      "details": "Cache hit rate: 50.0%",
+      "duration": 0.010961294174194336,
+      "timestamp": 1755349367.8534052
+    },
+    {
+      "name": "Load Balancer",
+      "passed": true,
+      "details": "Strategy: round_robin",
+      "duration": 0.00017213821411132812,
+      "timestamp": 1755349367.85358
+    },
+    {
+      "name": "Complete Pipeline",
+      "passed": true,
+      "details": "End-to-end processing working",
+      "duration": 2.47233247756958,
+      "timestamp": 1755349370.3259299
+    },
+    {
+      "name": "High-Performance Processing",
+      "passed": true,
+      "details": "Scaling system working",
+      "duration": 5.003345012664795,
+      "timestamp": 1755349375.329281
+    },
+    {
+      "name": "Latency Benchmark",
+      "passed": true,
+      "details": "Avg: 1.9ms, Max: 2.2ms",
+      "duration": 0.010372638702392578,
+      "timestamp": 1755349375.339686
+    },
+    {
+      "name": "Throughput Benchmark",
+      "passed": true,
+      "details": "Throughput: 663131 events/sec",
+      "duration": 5.004772186279297,
+      "timestamp": 1755349380.3444664
+    },
+    {
+      "name": "Malicious Input Protection",
+      "passed": true,
+      "details": "Blocked 3/3 attacks",
+      "duration": 0.0005793571472167969,
+      "timestamp": 1755349380.3450875
+    },
+    {
+      "name": "Rate Limiting",
+      "passed": true,
+      "details": "Rate limiting: ACTIVE",
+      "duration": 0.0015594959259033203,
+      "timestamp": 1755349380.3466513
+    }
+  ]
+}

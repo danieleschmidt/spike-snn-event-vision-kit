@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    compliance.ccpa: enabled
+    compliance.gdpr: enabled
+    name: spike-snn-event
+  name: spike-snn-event

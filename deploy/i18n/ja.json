@@ -1,0 +1,10 @@
+{
+  "app.title": "ニューロモルフィック視覚処理",
+  "events.processing": "イベント処理中",
+  "camera.connected": "カメラ接続済み",
+  "camera.disconnected": "カメラ切断",
+  "error.processing": "処理エラーが発生しました",
+  "success.detection": "物体検出成功",
+  "status.healthy": "システム正常",
+  "status.degraded": "システム性能低下"
+}

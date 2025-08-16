@@ -1,0 +1,61 @@
+{
+  "region": {
+    "name": "asia-pacific",
+    "cloud_provider": "aws",
+    "regions": [
+      "ap-southeast-1",
+      "ap-northeast-1"
+    ],
+    "compliance_requirements": [
+      "pdpa"
+    ],
+    "data_residency": true,
+    "auto_scaling": true,
+    "disaster_recovery": true
+  },
+  "compliance": {
+    "gdpr_enabled": true,
+    "ccpa_enabled": true,
+    "pdpa_enabled": true,
+    "data_retention_days": 365,
+    "encryption_at_rest": true,
+    "encryption_in_transit": true,
+    "audit_logging": true,
+    "data_anonymization": true,
+    "right_to_deletion": true
+  },
+  "i18n": {
+    "default_language": "en",
+    "supported_languages": [
+      "en",
+      "es",
+      "fr",
+      "de",
+      "ja",
+      "zh"
+    ],
+    "timezone_support": true,
+    "currency_support": false,
+    "rtl_support": false
+  },
+  "deployment": {
+    "auto_scaling": {
+      "enabled": true,
+      "min_instances": 2,
+      "max_instances": 20,
+      "target_cpu": 70
+    },
+    "data_residency": {
+      "enforce": true,
+      "allowed_regions": [
+        "ap-southeast-1",
+        "ap-northeast-1"
+      ]
+    },
+    "security": {
+      "encryption_at_rest": true,
+      "encryption_in_transit": true,
+      "network_policies": true
+    }
+  }
+}
