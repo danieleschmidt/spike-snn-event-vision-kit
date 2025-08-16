@@ -1,0 +1,10 @@
+{
+  "app.title": "神经形态视觉处理",
+  "events.processing": "正在处理事件",
+  "camera.connected": "相机已连接",
+  "camera.disconnected": "相机已断开",
+  "error.processing": "处理错误发生",
+  "success.detection": "物体检测成功",
+  "status.healthy": "系统健康",
+  "status.degraded": "系统性能下降"
+}

@@ -1,0 +1,29 @@
+{
+  "default_language": "en",
+  "supported_languages": [
+    "en",
+    "es",
+    "fr",
+    "de",
+    "ja",
+    "zh"
+  ],
+  "fallback_language": "en",
+  "timezone_support": true,
+  "date_formats": {
+    "en": "MM/dd/yyyy",
+    "es": "dd/MM/yyyy",
+    "fr": "dd/MM/yyyy",
+    "de": "dd.MM.yyyy",
+    "ja": "yyyy/MM/dd",
+    "zh": "yyyy\u5e74MM\u6708dd\u65e5"
+  },
+  "number_formats": {
+    "en": "1,234.56",
+    "es": "1.234,56",
+    "fr": "1 234,56",
+    "de": "1.234,56",
+    "ja": "1,234.56",
+    "zh": "1,234.56"
+  }
+}

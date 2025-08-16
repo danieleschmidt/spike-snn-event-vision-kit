@@ -1,0 +1,10 @@
+{
+  "app.title": "Neuromorphic Vision Processing",
+  "events.processing": "Processing events",
+  "camera.connected": "Camera connected",
+  "camera.disconnected": "Camera disconnected",
+  "error.processing": "Processing error occurred",
+  "success.detection": "Object detection successful",
+  "status.healthy": "System healthy",
+  "status.degraded": "System performance degraded"
+}

@@ -1,309 +1,37 @@
-# =====================================================================================
-# PRODUCTION DOCKERFILE FOR NEUROMORPHIC VISION PROCESSING
-# =====================================================================================
-# Multi-stage build optimized for GPU-accelerated neuromorphic processing
-# with security hardening, monitoring, and compliance features.
-# =====================================================================================
+# Production Dockerfile for Neuromorphic Vision Processing
+FROM python:3.11-slim as base
 
-# =====================================================================================
-# BUILD STAGE - Compile dependencies and prepare application
-# =====================================================================================
-FROM nvidia/cuda:12.2-cudnn8-devel-ubuntu22.04 as builder
+# Security: Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Build arguments for customization
-ARG BUILD_DATE
-ARG VCS_REF
-ARG VERSION=latest
-ARG PYTHON_VERSION=3.11
-ARG CUDA_VERSION=12.2
-
-# Labels for container metadata
-LABEL maintainer="Platform Team <platform@example.com>" \
-      org.opencontainers.image.title="Neuromorphic Vision Kit - Production" \
-      org.opencontainers.image.description="Production-ready neuromorphic vision processing system" \
-      org.opencontainers.image.version="$VERSION" \
-      org.opencontainers.image.created="$BUILD_DATE" \
-      org.opencontainers.image.revision="$VCS_REF" \
-      org.opencontainers.image.vendor="Spike SNN Event Vision" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.documentation="https://github.com/danieleschmidt/spike-snn-event-vision-kit" \
-      org.opencontainers.image.source="https://github.com/danieleschmidt/spike-snn-event-vision-kit"
-
-# Environment variables for build
-ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    CUDA_VISIBLE_DEVICES=all \
-    NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    BUILDKIT_INLINE_CACHE=1
-
-# Install system dependencies and security updates
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    # Build essentials
-    build-essential \
-    cmake \
-    git \
-    pkg-config \
-    # Python and pip
-    python${PYTHON_VERSION} \
-    python${PYTHON_VERSION}-dev \
-    python3-pip \
-    # Scientific computing libraries
-    libopencv-dev \
-    libeigen3-dev \
-    libhdf5-dev \
-    libprotobuf-dev \
-    protobuf-compiler \
-    # Networking and compression
-    libssl-dev \
-    libffi-dev \
-    liblz4-dev \
-    libzstd-dev \
-    # Monitoring and observability
-    curl \
-    wget \
-    ca-certificates \
-    # Security tools
-    gnupg2 \
-    && apt-get upgrade -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Create application user with proper permissions
-RUN groupadd -r appgroup --gid=1000 && \
-    useradd -r -g appgroup --uid=1000 --home-dir=/app --shell=/bin/bash appuser && \
-    mkdir -p /app && \
-    chown -R appuser:appgroup /app
-
-# Set working directory
-WORKDIR /app
-
-# Copy requirements first for better layer caching
-COPY --chown=appuser:appgroup requirements.txt ./
-COPY --chown=appuser:appgroup pyproject.toml ./
-
-# Upgrade pip and install Python dependencies
-RUN python3 -m pip install --upgrade pip setuptools wheel && \
-    python3 -m pip install --no-cache-dir -r requirements.txt && \
-    python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
-    python3 -m pip install --no-cache-dir \
-        # Neuromorphic computing libraries
-        snntorch \
-        norse \
-        bindsnet \
-        # GPU acceleration
-        cupy-cuda12x \
-        # Monitoring and observability
-        prometheus-client \
-        opentelemetry-api \
-        opentelemetry-sdk \
-        opentelemetry-instrumentation \
-        # Performance optimization
-        numba \
-        # Security
-        cryptography \
-        # Data processing
-        h5py \
-        zarr \
-        # Networking
-        aiohttp \
-        uvloop && \
-    # Clean pip cache
-    python3 -m pip cache purge
-
-# Copy source code
-COPY --chown=appuser:appgroup src/ ./src/
-COPY --chown=appuser:appgroup setup.py ./
-COPY --chown=appuser:appgroup README.md ./
-COPY --chown=appuser:appgroup LICENSE ./
-
-# Install the application in development mode for faster builds
-RUN python3 -m pip install -e .
-
-# =====================================================================================
-# RUNTIME STAGE - Optimized runtime environment
-# =====================================================================================
-FROM nvidia/cuda:12.2-cudnn8-runtime-ubuntu22.04 as runtime
-
-# Build arguments
-ARG BUILD_DATE
-ARG VCS_REF
-ARG VERSION=latest
-ARG PYTHON_VERSION=3.11
-
-# Labels for runtime container
-LABEL maintainer="Platform Team <platform@example.com>" \
-      org.opencontainers.image.title="Neuromorphic Vision Kit - Runtime" \
-      org.opencontainers.image.description="Production runtime for neuromorphic vision processing" \
-      org.opencontainers.image.version="$VERSION" \
-      org.opencontainers.image.created="$BUILD_DATE" \
-      org.opencontainers.image.revision="$VCS_REF"
-
-# Runtime environment variables
-ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app/src \
-    # CUDA environment
-    CUDA_VISIBLE_DEVICES=all \
-    NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    # Application configuration
-    APP_ENV=production \
-    LOG_LEVEL=INFO \
-    WORKERS=4 \
-    # Security
-    PYTHONHTTPSVERIFY=1 \
-    # Monitoring
-    PROMETHEUS_PORT=9090 \
-    METRICS_PORT=8080 \
-    HEALTH_CHECK_PORT=8081
-
-# Install minimal runtime dependencies
-RUN apt-get update && apt-get install -y \
-    # Runtime essentials
-    python${PYTHON_VERSION} \
-    python3-pip \
-    # Required libraries
-    libopencv-core406 \
-    libopencv-imgproc406 \
-    libhdf5-103 \
-    # Monitoring tools
-    curl \
-    wget \
-    # Security updates
-    ca-certificates \
-    && apt-get upgrade -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Create application user (matching builder stage)
-RUN groupadd -r appgroup --gid=1000 && \
-    useradd -r -g appgroup --uid=1000 --home-dir=/app --shell=/bin/bash appuser
-
-# Create necessary directories with proper permissions
-RUN mkdir -p /app/{src,logs,data,models,config,tmp} && \
-    mkdir -p /var/log/neuromorphic && \
-    chown -R appuser:appgroup /app /var/log/neuromorphic && \
-    chmod 755 /app && \
-    chmod 750 /app/{logs,data,models,config,tmp} && \
-    chmod 755 /var/log/neuromorphic
-
-# Copy Python environment from builder
-COPY --from=builder --chown=appuser:appgroup /usr/local/lib/python${PYTHON_VERSION}/dist-packages /usr/local/lib/python${PYTHON_VERSION}/dist-packages
-COPY --from=builder --chown=appuser:appgroup /usr/local/bin /usr/local/bin
-
-# Copy application code from builder
-COPY --from=builder --chown=appuser:appgroup /app /app
-
-# Copy configuration and scripts
-COPY --chown=appuser:appgroup deploy/config/production.json /app/config/config.json
-COPY --chown=appuser:appgroup scripts/health_check.py /app/scripts/
-COPY --chown=appuser:appgroup scripts/entrypoint.sh /app/scripts/
-
-# Make scripts executable
-RUN chmod +x /app/scripts/entrypoint.sh /app/scripts/health_check.py
-
-# Switch to non-root user
-USER appuser
-
-# Set working directory
-WORKDIR /app
-
-# Health check configuration
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python3 /app/scripts/health_check.py || exit 1
-
-# Expose ports
-EXPOSE 8000 8080 8081 9090
-
-# Volume mounts for persistent data
-VOLUME ["/app/data", "/app/models", "/app/logs"]
-
-# Default command
-ENTRYPOINT ["/app/scripts/entrypoint.sh"]
-CMD ["python3", "-m", "spike_snn_event.cli", "serve", "--config", "/app/config/config.json"]
-
-# =====================================================================================
-# DEVELOPMENT STAGE - Development environment with additional tools
-# =====================================================================================
-FROM runtime as development
-
-# Switch back to root for development tools installation
-USER root
-
-# Install development dependencies
-RUN apt-get update && apt-get install -y \
-    # Development tools
-    vim \
-    git \
-    htop \
-    tree \
-    jq \
-    # Debugging tools
-    strace \
-    gdb \
-    # Network tools
-    netcat-openbsd \
-    telnet \
-    iputils-ping \
-    # Performance profiling
-    linux-tools-generic \
-    && apt-get clean \
+    gcc \
+    g++ \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install development Python packages
-RUN python3 -m pip install --no-cache-dir \
-    # Development tools
-    pytest \
-    pytest-cov \
-    pytest-asyncio \
-    black \
-    isort \
-    flake8 \
-    mypy \
-    # Debugging
-    ipdb \
-    pdb++ \
-    # Documentation
-    sphinx \
-    sphinx-rtd-theme \
-    # Jupyter for experimentation
-    jupyter \
-    jupyterlab
-
-# Switch back to app user
-USER appuser
-
-# Override default command for development
-CMD ["python3", "-m", "spike_snn_event.cli", "serve", "--config", "/app/config/config.json", "--debug"]
-
-# =====================================================================================
-# SECURITY STAGE - Hardened production container with minimal attack surface
-# =====================================================================================
-FROM gcr.io/distroless/python3-debian11:latest as security
-
-# Copy Python environment and application from runtime stage
-COPY --from=runtime /usr/local/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
-COPY --from=runtime --chown=1000:1000 /app /app
-
-# Set environment variables
-ENV PYTHONPATH=/app/src \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    APP_ENV=production
-
-# Switch to non-root user
-USER 1000
-
 # Set working directory
 WORKDIR /app
 
-# Expose only necessary port
-EXPOSE 8000
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Minimal entrypoint
-ENTRYPOINT ["python3", "-m", "spike_snn_event.cli", "serve", "--config", "/app/config/config.json"]
+# Copy application code
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+
+# Set permissions
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "from src.spike_snn_event.core import DVSCamera; camera=DVSCamera('DVS128'); print('healthy')"
+
+# Expose port
+EXPOSE 8080
+
+# Default command
+CMD ["python", "-m", "src.spike_snn_event.cli", "--port", "8080"]

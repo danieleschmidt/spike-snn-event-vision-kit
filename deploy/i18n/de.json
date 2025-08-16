@@ -1,0 +1,10 @@
+{
+  "app.title": "Neuromorphe Bildverarbeitung",
+  "events.processing": "Ereignisse verarbeiten",
+  "camera.connected": "Kamera verbunden",
+  "camera.disconnected": "Kamera getrennt",
+  "error.processing": "Verarbeitungsfehler aufgetreten",
+  "success.detection": "Objekterkennung erfolgreich",
+  "status.healthy": "System gesund",
+  "status.degraded": "Systemleistung beeinträchtigt"
+}

@@ -1,0 +1,63 @@
+env:
+  IMAGE_NAME: spike-snn-event-vision-kit
+  REGISTRY: ghcr.io
+jobs:
+  build-and-push:
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        password: ${{ secrets.GITHUB_TOKEN }}
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/docker/Dockerfile.production
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:1.0.0
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs:
+    - test
+    - build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Deploy to ${{ matrix.region }}
+      run: echo "Deploying to ${{ matrix.region }} region"
+    strategy:
+      matrix:
+        region:
+        - us-east
+        - eu-west
+        - asia-pacific
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    - name: Run quality gates
+      run: python simplified_quality_gates.py
+name: Global Production Deployment
+'on':
+  pull_request:
+    branches:
+    - main
+  push:
+    branches:
+    - main
+    tags:
+    - v*

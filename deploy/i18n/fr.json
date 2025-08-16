@@ -1,0 +1,10 @@
+{
+  "app.title": "Traitement de Vision Neuromorphique",
+  "events.processing": "Traitement des événements",
+  "camera.connected": "Caméra connectée",
+  "camera.disconnected": "Caméra déconnectée",
+  "error.processing": "Erreur de traitement survenue",
+  "success.detection": "Détection d'objet réussie",
+  "status.healthy": "Système en bonne santé",
+  "status.degraded": "Performance du système dégradée"
+}

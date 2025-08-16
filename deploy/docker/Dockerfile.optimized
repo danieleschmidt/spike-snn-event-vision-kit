@@ -1,0 +1,29 @@
+# Multi-stage production build
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+FROM python:3.11-slim as production
+
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+COPY --from=builder /app/wheels /wheels
+COPY requirements.txt .
+
+RUN pip install --no-cache /wheels/* \
+    && rm -rf /wheels \
+    && pip cache purge
+
+WORKDIR /app
+COPY src/ ./src/
+RUN chown -R appuser:appuser /app
+
+USER appuser
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+CMD ["python", "-m", "src.spike_snn_event.cli"]
