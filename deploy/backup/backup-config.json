@@ -1,0 +1,18 @@
+{
+  "strategy": "multi_region_replication",
+  "frequency": {
+    "database_backup": "hourly",
+    "application_backup": "daily",
+    "configuration_backup": "on_change"
+  },
+  "retention": {
+    "daily_backups": 30,
+    "weekly_backups": 12,
+    "monthly_backups": 12
+  },
+  "disaster_recovery": {
+    "rpo_minutes": 15,
+    "rto_minutes": 60,
+    "automated_failover": true
+  }
+}

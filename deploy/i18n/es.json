@@ -1,10 +1,6 @@
 {
-  "app.title": "Procesamiento de Visión Neuromórfica",
-  "events.processing": "Procesando eventos",
-  "camera.connected": "Cámara conectada",
-  "camera.disconnected": "Cámara desconectada",
-  "error.processing": "Error de procesamiento ocurrió",
-  "success.detection": "Detección de objeto exitosa",
-  "status.healthy": "Sistema saludable",
-  "status.degraded": "Rendimiento del sistema degradado"
+  "app_name": "Kit de Visión de Eventos SNN Spike",
+  "welcome_message": "Bienvenido al procesamiento de visión neuromórfica",
+  "processing_status": "Procesando eventos...",
+  "error_message": "Ocurrió un error durante el procesamiento"
 }

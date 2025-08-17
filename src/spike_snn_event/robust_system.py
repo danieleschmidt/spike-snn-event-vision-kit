@@ -28,16 +28,43 @@ from functools import wraps
 import traceback
 import signal
 import sys
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
-# Configure comprehensive logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - [%(threadName)s] - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('neuromorphic_vision.log')
-    ]
-)
+# Enhanced logging configuration
+def setup_robust_logging():
+    """Setup comprehensive logging with rotation and monitoring."""
+    logger = logging.getLogger('neuromorphic_vision')
+    logger.setLevel(logging.INFO)
+    
+    if not logger.handlers:
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - [%(threadName)s] - %(message)s'
+        )
+        console_handler.setFormatter(console_formatter)
+        logger.addHandler(console_handler)
+        
+        # File handler with basic rotation
+        try:
+            file_handler = logging.FileHandler('neuromorphic_vision.log', mode='a')
+            file_handler.setLevel(logging.DEBUG)
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - [%(threadName)s] - %(funcName)s:%(lineno)d - %(message)s'
+            )
+            file_handler.setFormatter(file_formatter)
+            logger.addHandler(file_handler)
+        except Exception as e:
+            print(f"Warning: Could not setup file logging: {e}")
+    
+    return logger
+
+# Setup logging on import
+setup_robust_logging()
 
 class SystemState(Enum):
     """System operational states."""

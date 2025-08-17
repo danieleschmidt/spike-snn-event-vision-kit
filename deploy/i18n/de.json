@@ -1,10 +1,6 @@
 {
-  "app.title": "Neuromorphe Bildverarbeitung",
-  "events.processing": "Ereignisse verarbeiten",
-  "camera.connected": "Kamera verbunden",
-  "camera.disconnected": "Kamera getrennt",
-  "error.processing": "Verarbeitungsfehler aufgetreten",
-  "success.detection": "Objekterkennung erfolgreich",
-  "status.healthy": "System gesund",
-  "status.degraded": "Systemleistung beeinträchtigt"
+  "app_name": "Spike SNN Event Vision Kit",
+  "welcome_message": "Willkommen zur neuromorphen Bildverarbeitung",
+  "processing_status": "Ereignisse werden verarbeitet...",
+  "error_message": "Ein Fehler ist bei der Verarbeitung aufgetreten"
 }

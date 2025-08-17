@@ -1,0 +1,23 @@
+{
+  "metrics": {
+    "prometheus_enabled": true,
+    "grafana_enabled": true,
+    "custom_dashboards": true
+  },
+  "logging": {
+    "centralized_logging": true,
+    "log_retention_days": 90,
+    "log_levels": [
+      "ERROR",
+      "WARN",
+      "INFO"
+    ]
+  },
+  "alerting": {
+    "alert_manager_enabled": true,
+    "notification_channels": [
+      "email",
+      "slack"
+    ]
+  }
+}

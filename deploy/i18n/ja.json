@@ -1,10 +1,6 @@
 {
-  "app.title": "ニューロモルフィック視覚処理",
-  "events.processing": "イベント処理中",
-  "camera.connected": "カメラ接続済み",
-  "camera.disconnected": "カメラ切断",
-  "error.processing": "処理エラーが発生しました",
-  "success.detection": "物体検出成功",
-  "status.healthy": "システム正常",
-  "status.degraded": "システム性能低下"
+  "app_name": "スパイクSNNイベントビジョンキット",
+  "welcome_message": "ニューロモルフィックビジョン処理へようこそ",
+  "processing_status": "イベントを処理中...",
+  "error_message": "処理中にエラーが発生しました"
 }
