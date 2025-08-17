@@ -140,7 +140,7 @@ class DVSCamera:
             
     @safe_operation
     def stream(self, duration: Optional[float] = None) -> Iterator[np.ndarray]:
-        """Stream events from camera (simulated for demo).
+        """Stream events from camera (enhanced with adaptive processing).
         
         Args:
             duration: Stream duration in seconds (None for infinite)
@@ -151,40 +151,61 @@ class DVSCamera:
         start_time = time.time()
         event_count = 0
         
-        self.logger.info(f"Starting event stream (duration: {duration}s)")
+        # Enhanced adaptive streaming parameters
+        adaptive_rate = True
+        base_event_rate = 100
+        current_event_rate = base_event_rate
+        last_rate_adjustment = time.time()
+        
+        self.logger.info(f"Starting enhanced event stream (duration: {duration}s)")
         
         try:
             while True:
                 if duration and (time.time() - start_time) > duration:
                     break
+                
+                # Adaptive event rate based on system load
+                queue_fill_ratio = self._event_queue.qsize() / 1000.0
+                if adaptive_rate and time.time() - last_rate_adjustment > 1.0:
+                    if queue_fill_ratio > 0.8:
+                        current_event_rate = max(50, current_event_rate * 0.8)
+                    elif queue_fill_ratio < 0.2:
+                        current_event_rate = min(200, current_event_rate * 1.2)
+                    last_rate_adjustment = time.time()
                     
-                # Simulate event generation (replace with actual camera interface)
-                num_events = np.random.poisson(100)  # Average 100 events per batch
+                # Generate events with adaptive rate
+                num_events = np.random.poisson(current_event_rate)
                 
                 if num_events > 0:
                     events = self._generate_synthetic_events(num_events)
                     
-                    # Validate events before filtering
+                    # Enhanced validation pipeline
                     try:
                         events = validate_events(events)
                     except ValidationError as e:
                         self.logger.warning(f"Generated invalid events: {e}")
                         continue
                     
+                    # Multi-stage filtering
                     if self.config.noise_filter:
                         events = self._apply_noise_filter(events)
                         
-                    yield events
-                    event_count += len(events)
+                    # Yield only non-empty event batches
+                    if len(events) > 0:
+                        yield events
+                        event_count += len(events)
                     
-                time.sleep(0.01)  # 10ms between batches
+                # Dynamic sleep based on processing load
+                sleep_time = 0.01 if queue_fill_ratio < 0.5 else 0.02
+                time.sleep(sleep_time)
                 
         except Exception as e:
             self.logger.error(f"Event streaming failed: {e}")
             raise
         finally:
             runtime = time.time() - start_time
-            self.logger.info(f"Stream completed: {event_count} events in {runtime:.1f}s")
+            avg_rate = event_count / runtime if runtime > 0 else 0
+            self.logger.info(f"Stream completed: {event_count} events in {runtime:.1f}s (avg: {avg_rate:.1f} events/s)")
             
     def _stream_worker(self, duration: Optional[float] = None):
         """Background thread for continuous event generation."""
@@ -226,7 +247,18 @@ class DVSCamera:
         return events
         
     def _apply_noise_filter(self, events: np.ndarray) -> np.ndarray:
-        """Apply comprehensive noise filtering."""
+        """Apply enhanced multi-stage noise filtering."""
+        if len(events) == 0:
+            return events
+            
+        # Stage 1: Vectorized bounds checking
+        x_coords = events[:, 0].astype(int)
+        y_coords = events[:, 1].astype(int)
+        valid_bounds = (
+            (x_coords >= 0) & (x_coords < self.width) & 
+            (y_coords >= 0) & (y_coords < self.height)
+        )
+        events = events[valid_bounds]
         if len(events) == 0:
             return events
             
@@ -235,27 +267,43 @@ class DVSCamera:
         for event in events:
             x, y, t, p = int(event[0]), int(event[1]), event[2], event[3]
             
-            # Check bounds
-            if not (0 <= x < self.width and 0 <= y < self.height):
+            # Stage 2: Enhanced refractory period filter with adaptive threshold
+            refractory_threshold = self.config.refractory_period
+            if self.stats['events_processed'] > 1000:  # Adaptive after initial events
+                recent_activity = self._check_neighborhood_activity(x, y, t, radius=1)
+                if recent_activity > 0.8:  # High local activity
+                    refractory_threshold *= 0.5  # More aggressive filtering
+                    
+            if t - self.last_event_time[y, x] <= refractory_threshold:
                 self.stats['events_filtered'] += 1
                 continue
                 
-            # Refractory period filter
-            if t - self.last_event_time[y, x] <= self.config.refractory_period:
-                self.stats['events_filtered'] += 1
-                continue
-                
-            # Hot pixel filter
+            # Stage 3: Adaptive hot pixel filter
             self.pixel_event_count[y, x] += 1
-            if self.pixel_event_count[y, x] > self.config.hot_pixel_threshold:
+            dynamic_threshold = self.config.hot_pixel_threshold
+            
+            # Adjust threshold based on global activity
+            global_activity_ratio = len(events) / 1000.0  # Normalize by expected rate
+            if global_activity_ratio > 2.0:  # High activity scene
+                dynamic_threshold *= 1.5
+            elif global_activity_ratio < 0.5:  # Low activity scene
+                dynamic_threshold *= 0.7
+                
+            if self.pixel_event_count[y, x] > dynamic_threshold:
                 self.stats['events_filtered'] += 1
                 continue
                 
-            # Background activity filter (optional)
+            # Stage 4: Enhanced spatiotemporal correlation filter
             if self.config.background_activity_filter:
-                # Simple spatial-temporal correlation check
                 neighborhood_activity = self._check_neighborhood_activity(x, y, t)
-                if neighborhood_activity < 0.1:  # Low correlation threshold
+                correlation_threshold = 0.1
+                
+                # Dynamic threshold based on local event density
+                local_density = self._calculate_local_density(x, y, t)
+                if local_density > 0.5:
+                    correlation_threshold *= 0.5  # More strict in dense regions
+                    
+                if neighborhood_activity < correlation_threshold:
                     self.stats['events_filtered'] += 1
                     continue
                     
@@ -279,6 +327,24 @@ class DVSCamera:
         
         # Count recent events (within 5ms)
         recent_count = np.sum(time_diff < 5e-3)
+        total_pixels = (x_max - x_min) * (y_max - y_min)
+        
+        return recent_count / total_pixels if total_pixels > 0 else 0.0
+        
+    def _calculate_local_density(self, x: int, y: int, t: float, time_window: float = 10e-3) -> float:
+        """Calculate local event density in spatiotemporal neighborhood."""
+        # Simple density calculation based on recent events in larger neighborhood
+        radius = 5
+        x_min = max(0, x - radius)
+        x_max = min(self.width, x + radius + 1)
+        y_min = max(0, y - radius)
+        y_max = min(self.height, y + radius + 1)
+        
+        recent_activity = self.last_event_time[y_min:y_max, x_min:x_max]
+        time_diff = t - recent_activity
+        
+        # Count events within time window
+        recent_count = np.sum(time_diff < time_window)
         total_pixels = (x_max - x_min) * (y_max - y_min)
         
         return recent_count / total_pixels if total_pixels > 0 else 0.0

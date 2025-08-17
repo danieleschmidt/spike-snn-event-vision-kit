@@ -1,0 +1,63 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "spike-snn-event-eu-west",
+    "namespace": "production",
+    "labels": {
+      "app": "spike-snn-event",
+      "region": "eu-west",
+      "version": "4.0.0"
+    }
+  },
+  "spec": {
+    "replicas": 2,
+    "selector": {
+      "matchLabels": {
+        "app": "spike-snn-event",
+        "region": "eu-west"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "spike-snn-event",
+          "region": "eu-west"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "spike-snn-event",
+            "image": "spike-snn-event:4.0.0",
+            "ports": [
+              {
+                "containerPort": 8080
+              }
+            ],
+            "env": [
+              {
+                "name": "REGION",
+                "value": "eu-west"
+              },
+              {
+                "name": "ENVIRONMENT",
+                "value": "production"
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "500m",
+                "memory": "1Gi"
+              },
+              "limits": {
+                "cpu": "2000m",
+                "memory": "4Gi"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

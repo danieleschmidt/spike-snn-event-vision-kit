@@ -1,10 +1,6 @@
 {
-  "app.title": "Traitement de Vision Neuromorphique",
-  "events.processing": "Traitement des événements",
-  "camera.connected": "Caméra connectée",
-  "camera.disconnected": "Caméra déconnectée",
-  "error.processing": "Erreur de traitement survenue",
-  "success.detection": "Détection d'objet réussie",
-  "status.healthy": "Système en bonne santé",
-  "status.degraded": "Performance du système dégradée"
+  "app_name": "Kit de Vision d'Événements SNN Spike",
+  "welcome_message": "Bienvenue dans le traitement de vision neuromorphique",
+  "processing_status": "Traitement des événements...",
+  "error_message": "Une erreur s'est produite lors du traitement"
 }

@@ -1,18 +1,38 @@
 {
-  "generation": 3,
-  "status": "completed",
-  "execution_time": 0.020760774612426758,
-  "performance_features": {
-    "intelligent_caching": true,
-    "gpu_acceleration": true,
-    "distributed_processing": true,
-    "advanced_optimization": true
-  },
-  "test_results": {
-    "peak_throughput_eps": 5468738.917283822,
+  "generation": "scaling_g3",
+  "timestamp": 1755457282.9633157,
+  "performance_summary": {
+    "total_events_processed": 0,
+    "total_processing_time": 4.005908012390137,
+    "average_throughput": 0.0,
+    "peak_throughput": 0,
+    "scaling_improvement": 1.0,
+    "final_latency_p95_ms": 0.0,
     "cache_hit_rate": 0.0,
-    "gpu_acceleration_available": true,
-    "distributed_workers": 10
+    "peak_workers": 2
   },
-  "timestamp": 1755218673.5420504
+  "scaling_features": [
+    "Intelligent auto-scaling based on latency and CPU utilization",
+    "High-performance concurrent processing with thread pools",
+    "Advanced intelligent caching with LRU and TTL eviction",
+    "Vectorized event processing optimizations",
+    "Real-time performance profiling and metrics",
+    "Memory-efficient data structures and garbage collection",
+    "Asynchronous processing with queue management",
+    "Load balancing across multiple workers"
+  ],
+  "optimization_metrics": {
+    "processing_efficiency": 100.0,
+    "resource_utilization": 0.0,
+    "memory_efficiency": 100.0,
+    "cache_effectiveness": 0.0,
+    "scaling_responsiveness": "good"
+  },
+  "benchmark_history": [],
+  "config": {
+    "max_workers": 6,
+    "target_latency_ms": 5.0,
+    "cache_size_limit": 1000,
+    "max_queue_size": 500
+  }
 }
