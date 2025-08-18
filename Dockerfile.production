@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for spike-snn-event-vision-kit
 # Stage 1: Builder
-FROM python:3.11-slim as builder
+FROM python:3.13.7-slim as builder
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 RUN pip install --no-cache-dir --user -e .
 
 # Stage 2: Production runtime
-FROM python:3.11-slim as production
+FROM python:3.13.7-slim as production
 
 # Create non-root user
 RUN groupadd -r snnuser && useradd -r -g snnuser snnuser
