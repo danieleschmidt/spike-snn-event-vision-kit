@@ -1,0 +1,119 @@
+{
+  "status": "healthy",
+  "health_score": 0.8135951510238648,
+  "latest_metrics": {
+    "timestamp": 1755658854.2838771,
+    "event_processing_rate": 100.0,
+    "inference_latency_ms": 0.18215179443359375,
+    "memory_usage_mb": 230.81640625,
+    "error_count": 0,
+    "success_rate": 1.0,
+    "system_load": 0.0,
+    "queue_utilization": 0.5,
+    "neural_firing_rate": 0.1,
+    "thermal_state": "optimal"
+  },
+  "active_alerts": [
+    {
+      "timestamp": 1755658854.2089186,
+      "type": "MEMORY_LEAK",
+      "data": {
+        "current_memory": 230.81640625,
+        "average_memory": 58.68828125,
+        "severity": "critical"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2198749,
+      "type": "MEMORY_LEAK",
+      "data": {
+        "current_memory": 230.81640625,
+        "average_memory": 80.204296875,
+        "severity": "critical"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2202895,
+      "type": "MEMORY_LEAK",
+      "data": {
+        "current_memory": 230.81640625,
+        "average_memory": 101.7203125,
+        "severity": "critical"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2207918,
+      "type": "MEMORY_LEAK",
+      "data": {
+        "current_memory": 230.81640625,
+        "average_memory": 123.236328125,
+        "severity": "critical"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2211738,
+      "type": "MEMORY_LEAK",
+      "data": {
+        "current_memory": 230.81640625,
+        "average_memory": 144.75234375,
+        "severity": "critical"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2341528,
+      "type": "LATENCY_SPIKE",
+      "data": {
+        "current_latency": 10.59412956237793,
+        "average_latency": 1.203012466430664,
+        "severity": "warning"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2381773,
+      "type": "LATENCY_SPIKE",
+      "data": {
+        "current_latency": 3.6652088165283203,
+        "average_latency": 1.555776596069336,
+        "severity": "warning"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.252044,
+      "type": "LATENCY_SPIKE",
+      "data": {
+        "current_latency": 10.798454284667969,
+        "average_latency": 1.5827417373657227,
+        "severity": "warning"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2660007,
+      "type": "LATENCY_SPIKE",
+      "data": {
+        "current_latency": 10.537147521972656,
+        "average_latency": 1.1919260025024414,
+        "severity": "warning"
+      },
+      "resolved": false
+    },
+    {
+      "timestamp": 1755658854.2807107,
+      "type": "LATENCY_SPIKE",
+      "data": {
+        "current_latency": 10.56814193725586,
+        "average_latency": 1.226353645324707,
+        "severity": "warning"
+      },
+      "resolved": false
+    }
+  ],
+  "recommendations": []
+}
