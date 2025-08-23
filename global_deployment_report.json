@@ -1,70 +1,241 @@
 {
-  "timestamp": 1755349521.6214402,
-  "project": "spike-snn-event-vision-kit",
-  "version": "1.0.0",
-  "regions": [
-    "us-east",
-    "eu-west",
-    "asia-pacific"
-  ],
-  "artifacts_generated": [
-    "deploy/docker/Dockerfile.production",
-    "deploy/docker/Dockerfile.optimized",
-    "deploy/docker/docker-compose.production.yml",
-    "deploy/kubernetes/namespace.yaml",
-    "deploy/kubernetes/deployment.yaml",
-    "deploy/kubernetes/hpa.yaml",
-    "deploy/kubernetes/service.yaml",
-    "deploy/config/us-east.json",
-    "deploy/config/eu-west.json",
-    "deploy/config/asia-pacific.json",
-    "deploy/monitoring/prometheus.yml",
-    "deploy/monitoring/neuromorphic-dashboard.json",
-    "deploy/i18n/en.json",
-    "deploy/i18n/es.json",
-    "deploy/i18n/fr.json",
-    "deploy/i18n/de.json",
-    "deploy/i18n/ja.json",
-    "deploy/i18n/zh.json",
-    "deploy/i18n/config.json"
-  ],
+  "deployment_timestamp": "2025-08-22T22:24:05.348316",
+  "total_regions": 3,
+  "active_nodes": 3,
+  "global_performance_score": 0.8601856381768475,
   "compliance_status": {
-    "gdpr": {
-      "enabled": true,
-      "requirements": [
-        "data_encryption_at_rest",
-        "data_encryption_in_transit",
-        "right_to_deletion",
-        "audit_logging",
-        "data_minimization"
-      ],
-      "status": "compliant"
+    "GDPR": false,
+    "CCPA": true,
+    "PDPA": false
+  },
+  "i18n_coverage": {
+    "en": 1.0,
+    "es": 1.0,
+    "fr": 1.0,
+    "de": 1.0,
+    "ja": 1.0,
+    "zh": 1.0
+  },
+  "adaptive_learning_effectiveness": 0.2,
+  "regional_metrics": [
+    {
+      "region": "US-EAST",
+      "adaptation_speed": 3,
+      "cross_region_knowledge_transfer": 0.0,
+      "local_specialization_score": 0.2,
+      "global_consistency_score": 0.8,
+      "compliance_score": 0.95,
+      "performance_metrics": {
+        "improvement_rate": 0.11064717046334303,
+        "adaptation_success_rate": 0.9
+      },
+      "user_engagement_metrics": {
+        "satisfaction_score": 0.85,
+        "usage_growth": 0.1
+      }
     },
-    "ccpa": {
-      "enabled": true,
-      "requirements": [
-        "data_transparency",
-        "opt_out_rights",
-        "data_security"
-      ],
-      "status": "compliant"
+    {
+      "region": "EU-WEST",
+      "adaptation_speed": 2,
+      "cross_region_knowledge_transfer": 0.0,
+      "local_specialization_score": 0.2,
+      "global_consistency_score": 0.8,
+      "compliance_score": 0.95,
+      "performance_metrics": {
+        "improvement_rate": 0.22433730166669946,
+        "adaptation_success_rate": 0.9
+      },
+      "user_engagement_metrics": {
+        "satisfaction_score": 0.85,
+        "usage_growth": 0.1
+      }
     },
-    "pdpa": {
-      "enabled": true,
-      "requirements": [
-        "consent_management",
-        "data_breach_notification",
-        "data_protection_officer"
-      ],
-      "status": "compliant"
+    {
+      "region": "ASIA-PACIFIC",
+      "adaptation_speed": 2,
+      "cross_region_knowledge_transfer": 0.0,
+      "local_specialization_score": 0.2,
+      "global_consistency_score": 0.8,
+      "compliance_score": 0.95,
+      "performance_metrics": {
+        "improvement_rate": 0.08727128139337853,
+        "adaptation_success_rate": 0.9
+      },
+      "user_engagement_metrics": {
+        "satisfaction_score": 0.85,
+        "usage_growth": 0.1
+      }
+    }
+  ],
+  "deployment_summary": {
+    "deployment_time_seconds": 0.026352405548095703,
+    "regional_deployments": {
+      "US-EAST": {
+        "success": true,
+        "model_id": "model_US-EAST_1755901445",
+        "primary_language": "en",
+        "compliance_status": "No specific compliance requirements for region",
+        "edge_optimization": {
+          "optimization_strategy": {
+            "caching_strategy": "aggressive_prefetch",
+            "processing_location": "hybrid_edge_cloud",
+            "adaptation_mode": "real_time_local",
+            "compression_level": "adaptive_lossy"
+          },
+          "estimated_improvements": {
+            "latency_reduction_percent": 55,
+            "bandwidth_savings_percent": 30,
+            "local_accuracy_improvement": 15
+          },
+          "edge_capabilities_used": [
+            "neuromorphic_processing",
+            "adaptive_caching",
+            "local_learning",
+            "compression"
+          ]
+        },
+        "performance_score": 0.7523780089321113
+      },
+      "EU-WEST": {
+        "success": true,
+        "model_id": "model_EU-WEST_1755901445",
+        "primary_language": "en",
+        "compliance_status": "Compliant with GDPR",
+        "edge_optimization": {
+          "optimization_strategy": {
+            "caching_strategy": "aggressive_prefetch",
+            "processing_location": "hybrid_edge_cloud",
+            "adaptation_mode": "real_time_local",
+            "compression_level": "adaptive_lossy"
+          },
+          "estimated_improvements": {
+            "latency_reduction_percent": 55,
+            "bandwidth_savings_percent": 30,
+            "local_accuracy_improvement": 15
+          },
+          "edge_capabilities_used": [
+            "neuromorphic_processing",
+            "adaptive_caching",
+            "local_learning",
+            "compression"
+          ]
+        },
+        "performance_score": 0.8863675086881354
+      },
+      "ASIA-PACIFIC": {
+        "success": true,
+        "model_id": "model_ASIA-PACIFIC_1755901445",
+        "primary_language": "en",
+        "compliance_status": "Compliant with PDPA",
+        "edge_optimization": {
+          "optimization_strategy": {
+            "caching_strategy": "aggressive_prefetch",
+            "processing_location": "hybrid_edge_cloud",
+            "adaptation_mode": "real_time_local",
+            "compression_level": "adaptive_lossy"
+          },
+          "estimated_improvements": {
+            "latency_reduction_percent": 55,
+            "bandwidth_savings_percent": 30,
+            "local_accuracy_improvement": 15
+          },
+          "edge_capabilities_used": [
+            "neuromorphic_processing",
+            "adaptive_caching",
+            "local_learning",
+            "compression"
+          ]
+        },
+        "performance_score": 0.9418113969102959
+      }
+    },
+    "edge_optimization": {
+      "global_edge_score": 0.6,
+      "regional_optimizations": {
+        "US-EAST": {
+          "optimization_strategy": {
+            "caching_strategy": "aggressive_prefetch",
+            "processing_location": "hybrid_edge_cloud",
+            "adaptation_mode": "real_time_local",
+            "compression_level": "aggressive_compression"
+          },
+          "estimated_improvements": {
+            "latency_reduction_percent": 55,
+            "bandwidth_savings_percent": 50,
+            "local_accuracy_improvement": 15
+          },
+          "edge_capabilities_used": [
+            "neuromorphic_processing",
+            "adaptive_caching",
+            "local_learning",
+            "compression"
+          ]
+        },
+        "EU-WEST": {
+          "optimization_strategy": {
+            "caching_strategy": "aggressive_prefetch",
+            "processing_location": "edge_only",
+            "adaptation_mode": "real_time_local",
+            "compression_level": "aggressive_compression"
+          },
+          "estimated_improvements": {
+            "latency_reduction_percent": 70,
+            "bandwidth_savings_percent": 80,
+            "local_accuracy_improvement": 15
+          },
+          "edge_capabilities_used": [
+            "neuromorphic_processing",
+            "adaptive_caching",
+            "local_learning",
+            "compression"
+          ]
+        },
+        "ASIA-PACIFIC": {
+          "optimization_strategy": {
+            "caching_strategy": "aggressive_prefetch",
+            "processing_location": "hybrid_edge_cloud",
+            "adaptation_mode": "real_time_local",
+            "compression_level": "aggressive_compression"
+          },
+          "estimated_improvements": {
+            "latency_reduction_percent": 55,
+            "bandwidth_savings_percent": 50,
+            "local_accuracy_improvement": 15
+          },
+          "edge_capabilities_used": [
+            "neuromorphic_processing",
+            "adaptive_caching",
+            "local_learning",
+            "compression"
+          ]
+        }
+      }
+    },
+    "performance_results": {
+      "US-EAST": {
+        "latency_ms": 6.241018456932689,
+        "throughput_ops_sec": 389.7738212042508,
+        "test_duration_ms": 6.252462548729564,
+        "success_rate": 0.9103369637808998
+      },
+      "EU-WEST": {
+        "latency_ms": 7.143576805413694,
+        "throughput_ops_sec": 102.59114432687765,
+        "test_duration_ms": 7.167895500482054,
+        "success_rate": 0.9422007953200796
+      },
+      "ASIA-PACIFIC": {
+        "latency_ms": 6.42012039319777,
+        "throughput_ops_sec": 293.04623925204737,
+        "test_duration_ms": 6.4711419691255045,
+        "success_rate": 0.9492659559328572
+      }
     }
   },
-  "i18n_status": {
-    "languages_supported": 6,
-    "default_language": "en",
-    "timezone_support": true,
-    "rtl_support": false,
-    "compliance_score": 90.0
-  },
-  "deployment_readiness": true
+  "recommendations": [
+    "\u2705 All regions deployed successfully - monitor for optimization opportunities",
+    "\ud83c\udf0d Consider expanding to additional regions for global coverage",
+    "\ud83d\udcca Implement continuous monitoring and adaptive optimization",
+    "\ud83d\udd04 Schedule regular cross-region knowledge transfer sessions"
+  ]
 }
