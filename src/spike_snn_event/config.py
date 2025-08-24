@@ -20,4 +20,175 @@ from .security import get_input_sanitizer
 
 
 class DeviceType(Enum):
-    """Supported device types."""\n    CPU = \"cpu\"\n    CUDA = \"cuda\"\n    GPU = \"gpu\"  # Alias for CUDA\n\n\nclass ModelType(Enum):\n    \"\"\"Supported model types.\"\"\"\n    SPIKING_YOLO = \"spiking_yolo\"\n    CUSTOM_SNN = \"custom_snn\"\n\n\nclass SensorType(Enum):\n    \"\"\"Supported sensor types.\"\"\"\n    DVS128 = \"DVS128\"\n    DVS240 = \"DVS240\"\n    DAVIS346 = \"DAVIS346\"\n    PROPHESEE = \"Prophesee\"\n\n\nclass LogLevel(Enum):\n    \"\"\"Supported log levels.\"\"\"\n    DEBUG = \"DEBUG\"\n    INFO = \"INFO\"\n    WARNING = \"WARNING\"\n    ERROR = \"ERROR\"\n    CRITICAL = \"CRITICAL\"\n\n\n@dataclass\nclass CameraConfiguration:\n    \"\"\"Camera configuration parameters.\"\"\"\n    sensor_type: SensorType = SensorType.DVS128\n    noise_filter: bool = True\n    refractory_period: float = 1e-3\n    hot_pixel_threshold: int = 1000\n    background_activity_filter: bool = True\n    publish_rate: float = 30.0\n    \n    def __post_init__(self):\n        \"\"\"Validate configuration after initialization.\"\"\"\n        if self.refractory_period <= 0:\n            raise ConfigurationError(\"Refractory period must be positive\")\n        if self.hot_pixel_threshold <= 0:\n            raise ConfigurationError(\"Hot pixel threshold must be positive\")\n        if self.publish_rate <= 0:\n            raise ConfigurationError(\"Publish rate must be positive\")\n\n\n@dataclass\nclass ModelConfiguration:\n    \"\"\"Model configuration parameters.\"\"\"\n    model_type: ModelType = ModelType.SPIKING_YOLO\n    model_path: Optional[str] = None\n    pretrained_model: str = \"yolo_v4_spiking_dvs\"\n    input_width: int = 128\n    input_height: int = 128\n    num_classes: int = 80\n    time_steps: int = 10\n    integration_time_ms: float = 10.0\n    detection_threshold: float = 0.5\n    device: DeviceType = DeviceType.CPU\n    use_gpu: bool = True\n    \n    def __post_init__(self):\n        \"\"\"Validate configuration after initialization.\"\"\"\n        if self.input_width <= 0 or self.input_height <= 0:\n            raise ConfigurationError(\"Input dimensions must be positive\")\n        if self.num_classes <= 0:\n            raise ConfigurationError(\"Number of classes must be positive\")\n        if self.time_steps <= 0:\n            raise ConfigurationError(\"Time steps must be positive\")\n        if not (0.0 <= self.detection_threshold <= 1.0):\n            raise ConfigurationError(\"Detection threshold must be between 0 and 1\")\n        if self.integration_time_ms <= 0:\n            raise ConfigurationError(\"Integration time must be positive\")\n\n\n@dataclass\nclass TrainingConfiguration:\n    \"\"\"Training configuration parameters.\"\"\"\n    learning_rate: float = 1e-3\n    epochs: int = 100\n    batch_size: int = 32\n    early_stopping_patience: int = 10\n    gradient_clip_value: float = 1.0\n    loss_function: str = \"cross_entropy\"\n    optimizer: str = \"adam\"\n    weight_decay: float = 1e-4\n    lr_scheduler: str = \"cosine\"\n    surrogate_gradient: str = \"fast_sigmoid\"\n    validation_split: float = 0.2\n    save_best_model: bool = True\n    \n    def __post_init__(self):\n        \"\"\"Validate configuration after initialization.\"\"\"\n        if self.learning_rate <= 0:\n            raise ConfigurationError(\"Learning rate must be positive\")\n        if self.epochs <= 0:\n            raise ConfigurationError(\"Epochs must be positive\")\n        if self.batch_size <= 0:\n            raise ConfigurationError(\"Batch size must be positive\")\n        if not (0.0 <= self.validation_split < 1.0):\n            raise ConfigurationError(\"Validation split must be between 0 and 1\")\n        if self.gradient_clip_value <= 0:\n            raise ConfigurationError(\"Gradient clip value must be positive\")\n\n\n@dataclass\nclass MonitoringConfiguration:\n    \"\"\"Monitoring configuration parameters.\"\"\"\n    enable_monitoring: bool = True\n    metrics_collection_interval: float = 30.0\n    health_check_interval: float = 60.0\n    log_level: LogLevel = LogLevel.INFO\n    log_file: Optional[str] = None\n    export_metrics: bool = False\n    metrics_export_path: str = \"metrics\"\n    dashboard_update_interval: float = 30.0\n    \n    def __post_init__(self):\n        \"\"\"Validate configuration after initialization.\"\"\"\n        if self.metrics_collection_interval <= 0:\n            raise ConfigurationError(\"Metrics collection interval must be positive\")\n        if self.health_check_interval <= 0:\n            raise ConfigurationError(\"Health check interval must be positive\")\n        if self.dashboard_update_interval <= 0:\n            raise ConfigurationError(\"Dashboard update interval must be positive\")\n\n\n@dataclass\nclass SecurityConfiguration:\n    \"\"\"Security configuration parameters.\"\"\"\n    enable_authentication: bool = False\n    enable_rate_limiting: bool = True\n    rate_limit_requests: int = 100\n    rate_limit_window: float = 60.0\n    max_file_size_mb: int = 100\n    allowed_file_extensions: List[str] = field(\n        default_factory=lambda: ['.npy', '.txt', '.h5', '.json', '.yaml', '.yml']\n    )\n    enable_input_sanitization: bool = True\n    audit_log_file: Optional[str] = None\n    \n    def __post_init__(self):\n        \"\"\"Validate configuration after initialization.\"\"\"\n        if self.rate_limit_requests <= 0:\n            raise ConfigurationError(\"Rate limit requests must be positive\")\n        if self.rate_limit_window <= 0:\n            raise ConfigurationError(\"Rate limit window must be positive\")\n        if self.max_file_size_mb <= 0:\n            raise ConfigurationError(\"Max file size must be positive\")\n\n\n@dataclass\nclass SystemConfiguration:\n    \"\"\"Complete system configuration.\"\"\"\n    camera: CameraConfiguration = field(default_factory=CameraConfiguration)\n    model: ModelConfiguration = field(default_factory=ModelConfiguration)\n    training: TrainingConfiguration = field(default_factory=TrainingConfiguration)\n    monitoring: MonitoringConfiguration = field(default_factory=MonitoringConfiguration)\n    security: SecurityConfiguration = field(default_factory=SecurityConfiguration)\n    \n    # Global settings\n    output_dir: str = \"./output\"\n    data_dir: str = \"./data\"\n    temp_dir: str = \"./temp\"\n    \n    def __post_init__(self):\n        \"\"\"Validate configuration after initialization.\"\"\"\n        # Ensure directories are valid paths\n        for dir_field in ['output_dir', 'data_dir', 'temp_dir']:\n            dir_path = getattr(self, dir_field)\n            if not isinstance(dir_path, str) or not dir_path.strip():\n                raise ConfigurationError(f\"{dir_field} must be a non-empty string\")\n\n\nclass ConfigurationLoader:\n    \"\"\"Loads and validates configuration from various sources.\"\"\"\n    \n    def __init__(self):\n        self.input_sanitizer = get_input_sanitizer()\n        self.logger = logging.getLogger(__name__)\n        \n    def load_from_file(self, config_path: Union[str, Path]) -> SystemConfiguration:\n        \"\"\"Load configuration from file.\"\"\"\n        config_path = validate_file_path(\n            config_path, \n            must_exist=True, \n            must_be_file=True,\n            allowed_extensions=['.json', '.yaml', '.yml']\n        )\n        \n        self.logger.info(f\"Loading configuration from {config_path}\")\n        \n        try:\n            with open(config_path, 'r') as f:\n                if config_path.suffix.lower() in ['.yaml', '.yml']:\n                    raw_config = yaml.safe_load(f)\n                else:\n                    raw_config = json.load(f)\n        except Exception as e:\n            raise ConfigurationError(f\"Failed to load configuration file: {e}\")\n            \n        if not isinstance(raw_config, dict):\n            raise ConfigurationError(\"Configuration file must contain a dictionary\")\n            \n        return self._parse_configuration(raw_config)\n        \n    def load_from_dict(self, config_dict: Dict[str, Any]) -> SystemConfiguration:\n        \"\"\"Load configuration from dictionary.\"\"\"\n        return self._parse_configuration(config_dict)\n        \n    def load_from_env(self, prefix: str = \"SPIKE_SNN_\") -> SystemConfiguration:\n        \"\"\"Load configuration from environment variables.\"\"\"\n        env_config = {}\n        \n        for key, value in os.environ.items():\n            if key.startswith(prefix):\n                config_key = key[len(prefix):].lower()\n                env_config[config_key] = self._parse_env_value(value)\n                \n        return self._parse_configuration(env_config)\n        \n    def load_with_overrides(\n        self,\n        base_config_path: Optional[Union[str, Path]] = None,\n        env_prefix: str = \"SPIKE_SNN_\",\n        override_dict: Optional[Dict[str, Any]] = None\n    ) -> SystemConfiguration:\n        \"\"\"Load configuration with multiple sources and overrides.\"\"\"\n        \n        # Start with default configuration\n        config = SystemConfiguration()\n        config_dict = self._dataclass_to_dict(config)\n        \n        # Override with file configuration\n        if base_config_path:\n            file_config = self.load_from_file(base_config_path)\n            config_dict = self._merge_configs(config_dict, self._dataclass_to_dict(file_config))\n            \n        # Override with environment variables\n        env_config = {}\n        for key, value in os.environ.items():\n            if key.startswith(env_prefix):\n                config_key = key[len(env_prefix):].lower()\n                self._set_nested_value(env_config, config_key, self._parse_env_value(value))\n                \n        if env_config:\n            config_dict = self._merge_configs(config_dict, env_config)\n            \n        # Override with provided dictionary\n        if override_dict:\n            config_dict = self._merge_configs(config_dict, override_dict)\n            \n        return self._parse_configuration(config_dict)\n        \n    def _parse_configuration(self, config_dict: Dict[str, Any]) -> SystemConfiguration:\n        \"\"\"Parse configuration dictionary into SystemConfiguration object.\"\"\"\n        sanitized_config = self.input_sanitizer.sanitize_dict_input(\n            config_dict,\n            field_name=\"configuration\"\n        )\n        \n        try:\n            return self._dict_to_dataclass(SystemConfiguration, sanitized_config)\n        except Exception as e:\n            raise ConfigurationError(f\"Failed to parse configuration: {e}\")\n            \n    def _dict_to_dataclass(self, dataclass_type: Type, data: Dict[str, Any]):\n        \"\"\"Convert dictionary to dataclass instance.\"\"\"\n        field_dict = {f.name: f for f in fields(dataclass_type)}\n        kwargs = {}\n        \n        for key, value in data.items():\n            if key in field_dict:\n                field_info = field_dict[key]\n                \n                # Handle nested dataclasses\n                if hasattr(field_info.type, '__dataclass_fields__'):\n                    if isinstance(value, dict):\n                        kwargs[key] = self._dict_to_dataclass(field_info.type, value)\n                    else:\n                        kwargs[key] = value\n                # Handle enums\n                elif hasattr(field_info.type, '__members__'):\n                    if isinstance(value, str):\n                        try:\n                            kwargs[key] = field_info.type(value)\n                        except ValueError:\n                            # Try case-insensitive matching\n                            for enum_member in field_info.type:\n                                if enum_member.value.lower() == value.lower():\n                                    kwargs[key] = enum_member\n                                    break\n                            else:\n                                self.logger.warning(f\"Invalid enum value '{value}' for field '{key}'\")\n                                # Use default value\n                    else:\n                        kwargs[key] = value\n                else:\n                    kwargs[key] = value\n                    \n        return dataclass_type(**kwargs)\n        \n    def _dataclass_to_dict(self, obj) -> Dict[str, Any]:\n        \"\"\"Convert dataclass instance to dictionary.\"\"\"\n        result = {}\n        \n        for field_info in fields(obj):\n            value = getattr(obj, field_info.name)\n            \n            if hasattr(value, '__dataclass_fields__'):\n                result[field_info.name] = self._dataclass_to_dict(value)\n            elif hasattr(value, 'value'):  # Enum\n                result[field_info.name] = value.value\n            else:\n                result[field_info.name] = value\n                \n        return result\n        \n    def _merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:\n        \"\"\"Recursively merge configuration dictionaries.\"\"\"\n        result = base.copy()\n        \n        for key, value in override.items():\n            if key in result and isinstance(result[key], dict) and isinstance(value, dict):\n                result[key] = self._merge_configs(result[key], value)\n            else:\n                result[key] = value\n                \n        return result\n        \n    def _set_nested_value(self, config: Dict[str, Any], key_path: str, value: Any):\n        \"\"\"Set nested dictionary value using dot notation.\"\"\"\n        keys = key_path.split('_')\n        current = config\n        \n        for key in keys[:-1]:\n            if key not in current:\n                current[key] = {}\n            current = current[key]\n            \n        current[keys[-1]] = value\n        \n    def _parse_env_value(self, value: str) -> Any:\n        \"\"\"Parse environment variable value to appropriate type.\"\"\"\n        # Handle boolean values\n        if value.lower() in ('true', '1', 'yes', 'on'):\n            return True\n        elif value.lower() in ('false', '0', 'no', 'off'):\n            return False\n            \n        # Handle numeric values\n        try:\n            if '.' in value:\n                return float(value)\n            else:\n                return int(value)\n        except ValueError:\n            pass\n            \n        # Handle JSON arrays/objects\n        if value.startswith(('[', '{')):\n            try:\n                return json.loads(value)\n            except json.JSONDecodeError:\n                pass\n                \n        # Return as string\n        return value\n\n\nclass ConfigurationValidator:\n    \"\"\"Validates configuration for consistency and safety.\"\"\"\n    \n    def __init__(self):\n        self.logger = logging.getLogger(__name__)\n        \n    def validate(self, config: SystemConfiguration) -> Dict[str, List[str]]:\n        \"\"\"Validate configuration and return any warnings or errors.\"\"\"\n        warnings = []\n        errors = []\n        \n        # Validate model configuration\n        model_warnings, model_errors = self._validate_model_config(config.model)\n        warnings.extend(model_warnings)\n        errors.extend(model_errors)\n        \n        # Validate training configuration\n        training_warnings, training_errors = self._validate_training_config(config.training)\n        warnings.extend(training_warnings)\n        errors.extend(training_errors)\n        \n        # Validate directory paths\n        dir_warnings, dir_errors = self._validate_directories(config)\n        warnings.extend(dir_warnings)\n        errors.extend(dir_errors)\n        \n        # Cross-validation between configurations\n        cross_warnings, cross_errors = self._cross_validate(config)\n        warnings.extend(cross_warnings)\n        errors.extend(cross_errors)\n        \n        return {'warnings': warnings, 'errors': errors}\n        \n    def _validate_model_config(self, model_config: ModelConfiguration) -> tuple:\n        \"\"\"Validate model configuration.\"\"\"\n        warnings = []\n        errors = []\n        \n        # Check model path if specified\n        if model_config.model_path:\n            model_path = Path(model_config.model_path)\n            if not model_path.exists():\n                errors.append(f\"Model path does not exist: {model_path}\")\n                \n        # Check device configuration\n        if model_config.device == DeviceType.CUDA and not model_config.use_gpu:\n            warnings.append(\"CUDA device specified but use_gpu is False\")\n            \n        # Check input dimensions\n        if model_config.input_width != model_config.input_height:\n            warnings.append(\"Non-square input dimensions may affect model performance\")\n            \n        return warnings, errors\n        \n    def _validate_training_config(self, training_config: TrainingConfiguration) -> tuple:\n        \"\"\"Validate training configuration.\"\"\"\n        warnings = []\n        errors = []\n        \n        # Check learning rate\n        if training_config.learning_rate > 0.1:\n            warnings.append(\"High learning rate may cause training instability\")\n        elif training_config.learning_rate < 1e-6:\n            warnings.append(\"Very low learning rate may cause slow convergence\")\n            \n        # Check batch size\n        if training_config.batch_size > 128:\n            warnings.append(\"Large batch size may require significant memory\")\n        elif training_config.batch_size < 4:\n            warnings.append(\"Small batch size may cause training instability\")\n            \n        return warnings, errors\n        \n    def _validate_directories(self, config: SystemConfiguration) -> tuple:\n        \"\"\"Validate directory configurations.\"\"\"\n        warnings = []\n        errors = []\n        \n        directories = [config.output_dir, config.data_dir, config.temp_dir]\n        \n        for directory in directories:\n            dir_path = Path(directory)\n            \n            # Check if parent directory exists\n            if not dir_path.parent.exists():\n                errors.append(f\"Parent directory does not exist: {dir_path.parent}\")\n                \n            # Check if directory is writable (if it exists)\n            if dir_path.exists() and not os.access(dir_path, os.W_OK):\n                errors.append(f\"Directory is not writable: {dir_path}\")\n                \n        return warnings, errors\n        \n    def _cross_validate(self, config: SystemConfiguration) -> tuple:\n        \"\"\"Cross-validate configuration sections.\"\"\"\n        warnings = []\n        errors = []\n        \n        # Check camera and model compatibility\n        sensor_resolutions = {\n            SensorType.DVS128: (128, 128),\n            SensorType.DVS240: (240, 180),\n            SensorType.DAVIS346: (346, 240),\n            SensorType.PROPHESEE: (640, 480)\n        }\n        \n        if config.camera.sensor_type in sensor_resolutions:\n            expected_width, expected_height = sensor_resolutions[config.camera.sensor_type]\n            if (config.model.input_width != expected_width or \n                config.model.input_height != expected_height):\n                warnings.append(\n                    f\"Model input size ({config.model.input_width}x{config.model.input_height}) \"\n                    f\"doesn't match sensor resolution ({expected_width}x{expected_height})\"\n                )\n                \n        return warnings, errors\n\n\ndef save_configuration(config: SystemConfiguration, output_path: Union[str, Path]):\n    \"\"\"Save configuration to file.\"\"\"\n    output_path = Path(output_path)\n    \n    loader = ConfigurationLoader()\n    config_dict = loader._dataclass_to_dict(config)\n    \n    with open(output_path, 'w') as f:\n        if output_path.suffix.lower() in ['.yaml', '.yml']:\n            yaml.dump(config_dict, f, default_flow_style=False, indent=2)\n        else:\n            json.dump(config_dict, f, indent=2)\n            \n    logging.info(f\"Configuration saved to {output_path}\")\n\n\ndef load_configuration(\n    config_path: Optional[Union[str, Path]] = None,\n    validate: bool = True\n) -> SystemConfiguration:\n    \"\"\"Load and validate configuration.\"\"\"\n    loader = ConfigurationLoader()\n    \n    if config_path:\n        config = loader.load_from_file(config_path)\n    else:\n        # Load from environment and defaults\n        config = loader.load_with_overrides()\n        \n    if validate:\n        validator = ConfigurationValidator()\n        validation_result = validator.validate(config)\n        \n        # Log warnings\n        for warning in validation_result['warnings']:\n            logging.warning(f\"Configuration warning: {warning}\")\n            \n        # Raise error if there are validation errors\n        if validation_result['errors']:\n            error_msg = \"Configuration validation failed:\\n\" + \"\\n\".join(\n                f\"  - {error}\" for error in validation_result['errors']\n            )\n            raise ConfigurationError(error_msg)\n            \n    return config\n\n\ndef create_default_config(output_path: Union[str, Path]):\n    \"\"\"Create a default configuration file.\"\"\"\n    default_config = SystemConfiguration()\n    save_configuration(default_config, output_path)\n    logging.info(f\"Default configuration created at {output_path}\")
+    """Supported device types."""
+    CPU = "cpu"
+    CUDA = "cuda"
+    GPU = "gpu"  # Alias for CUDA
+
+
+class ModelType(Enum):
+    """Supported model types."""
+    SPIKING_YOLO = "spiking_yolo"
+    CUSTOM_SNN = "custom_snn"
+
+
+class SensorType(Enum):
+    """Supported sensor types."""
+    DVS128 = "DVS128"
+    DVS240 = "DVS240"
+    DAVIS346 = "DAVIS346"
+    PROPHESEE = "Prophesee"
+
+
+class LogLevel(Enum):
+    """Supported log levels."""
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+@dataclass
+class CameraConfiguration:
+    """Camera configuration parameters."""
+    sensor_type: SensorType = SensorType.DVS128
+    noise_filter: bool = True
+    refractory_period: float = 1e-3
+    hot_pixel_threshold: int = 1000
+    background_activity_filter: bool = True
+    publish_rate: float = 30.0
+    
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if self.refractory_period <= 0:
+            raise ConfigurationError("Refractory period must be positive")
+        if self.hot_pixel_threshold <= 0:
+            raise ConfigurationError("Hot pixel threshold must be positive")
+        if self.publish_rate <= 0:
+            raise ConfigurationError("Publish rate must be positive")
+
+
+@dataclass
+class ModelConfiguration:
+    """Model configuration parameters."""
+    model_type: ModelType = ModelType.SPIKING_YOLO
+    model_path: Optional[str] = None
+    pretrained_model: str = "yolo_v4_spiking_dvs"
+    input_width: int = 128
+    input_height: int = 128
+    num_classes: int = 80
+    time_steps: int = 10
+    integration_time_ms: float = 10.0
+    detection_threshold: float = 0.5
+    device: DeviceType = DeviceType.CPU
+    use_gpu: bool = True
+    
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if self.input_width <= 0 or self.input_height <= 0:
+            raise ConfigurationError("Input dimensions must be positive")
+        if self.num_classes <= 0:
+            raise ConfigurationError("Number of classes must be positive")
+        if self.time_steps <= 0:
+            raise ConfigurationError("Time steps must be positive")
+        if not (0.0 <= self.detection_threshold <= 1.0):
+            raise ConfigurationError("Detection threshold must be between 0 and 1")
+        if self.integration_time_ms <= 0:
+            raise ConfigurationError("Integration time must be positive")
+
+
+@dataclass
+class SystemConfiguration:
+    """Complete system configuration."""
+    camera: CameraConfiguration = field(default_factory=CameraConfiguration)
+    model: ModelConfiguration = field(default_factory=ModelConfiguration)
+    
+    # Global settings
+    output_dir: str = "./output"
+    data_dir: str = "./data"
+    temp_dir: str = "./temp"
+    
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        # Ensure directories are valid paths
+        for dir_field in ['output_dir', 'data_dir', 'temp_dir']:
+            dir_path = getattr(self, dir_field)
+            if not isinstance(dir_path, str) or not dir_path.strip():
+                raise ConfigurationError(f"{dir_field} must be a non-empty string")
+
+
+class ConfigurationError(Exception):
+    """Configuration validation error."""
+    pass
+
+
+def load_configuration(
+    config_path: Optional[Union[str, Path]] = None,
+    validate: bool = True
+) -> SystemConfiguration:
+    """Load and validate configuration."""
+    if config_path:
+        config_path = Path(config_path)
+        try:
+            with open(config_path, 'r') as f:
+                if config_path.suffix.lower() in ['.yaml', '.yml']:
+                    config_data = yaml.safe_load(f)
+                else:
+                    config_data = json.load(f)
+        except Exception as e:
+            raise ConfigurationError(f"Failed to load configuration file: {e}")
+            
+        if not isinstance(config_data, dict):
+            raise ConfigurationError("Configuration file must contain a dictionary")
+    else:
+        config_data = {}
+    
+    return SystemConfiguration(**config_data)
+
+
+def save_configuration(config: SystemConfiguration, output_path: Union[str, Path]):
+    """Save configuration to file."""
+    output_path = Path(output_path)
+    
+    config_dict = {
+        'camera': {
+            'sensor_type': config.camera.sensor_type.value,
+            'noise_filter': config.camera.noise_filter,
+            'refractory_period': config.camera.refractory_period,
+            'hot_pixel_threshold': config.camera.hot_pixel_threshold,
+            'background_activity_filter': config.camera.background_activity_filter,
+            'publish_rate': config.camera.publish_rate
+        },
+        'model': {
+            'model_type': config.model.model_type.value,
+            'model_path': config.model.model_path,
+            'pretrained_model': config.model.pretrained_model,
+            'input_width': config.model.input_width,
+            'input_height': config.model.input_height,
+            'num_classes': config.model.num_classes,
+            'time_steps': config.model.time_steps,
+            'integration_time_ms': config.model.integration_time_ms,
+            'detection_threshold': config.model.detection_threshold,
+            'device': config.model.device.value,
+            'use_gpu': config.model.use_gpu
+        },
+        'output_dir': config.output_dir,
+        'data_dir': config.data_dir,
+        'temp_dir': config.temp_dir
+    }
+    
+    with open(output_path, 'w') as f:
+        if output_path.suffix.lower() in ['.yaml', '.yml']:
+            yaml.dump(config_dict, f, default_flow_style=False, indent=2)
+        else:
+            json.dump(config_dict, f, indent=2)
+            
+    logging.info(f"Configuration saved to {output_path}")
+
+
+def create_default_config(output_path: Union[str, Path]):
+    """Create a default configuration file."""
+    default_config = SystemConfiguration()
+    save_configuration(default_config, output_path)
+    logging.info(f"Default configuration created at {output_path}")

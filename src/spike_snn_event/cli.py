@@ -1,4 +1,3 @@
-```python
 """
 Command-line interface for the spike-snn-event-vision-kit.
 
@@ -584,4 +583,3 @@ def demo():
 
 if __name__ == "__main__":
     main()
-```
