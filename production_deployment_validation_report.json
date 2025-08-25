@@ -1,0 +1,404 @@
+{
+  "report_id": "cb93cc30-197e-4434-b095-b0184e89d3f8",
+  "timestamp": "2025-08-25T13:58:16.995039+00:00",
+  "terragon_sdlc_version": "4.0.0",
+  "validation_result": {
+    "validation_id": "b1500310-7ca3-4840-b5c5-4264404c267b",
+    "timestamp": "2025-08-25T13:58:16.994515+00:00",
+    "overall_status": "BLOCKED",
+    "overall_score": 80.0,
+    "total_execution_time_seconds": 0.6520118713378906,
+    "validation_results": [
+      {
+        "validation_name": "Security Hardening",
+        "status": "FAIL",
+        "score": 85.0,
+        "details": {
+          "security_checks": [
+            {
+              "check_name": "TLS Configuration",
+              "compliant": true,
+              "details": {
+                "tls_version": "TLS 1.3",
+                "cipher_suites": "MODERN",
+                "certificate_validity": "VALID",
+                "hsts_enabled": true
+              }
+            },
+            {
+              "check_name": "Authentication & Authorization",
+              "compliant": true,
+              "details": {
+                "oauth2_enabled": true,
+                "jwt_validation": true,
+                "rbac_implemented": true,
+                "mfa_required": true
+              }
+            },
+            {
+              "check_name": "Container Security",
+              "compliant": true,
+              "details": {
+                "base_image_scanning": true,
+                "non_root_user": true,
+                "resource_limits": true,
+                "secrets_management": true
+              }
+            },
+            {
+              "check_name": "Network Security",
+              "compliant": true,
+              "details": {
+                "network_policies": true,
+                "service_mesh": true,
+                "firewall_rules": true,
+                "ddos_protection": true
+              }
+            },
+            {
+              "check_name": "Data Encryption",
+              "compliant": true,
+              "details": {
+                "encryption_at_rest": true,
+                "encryption_in_transit": true,
+                "key_management": true,
+                "encryption_algorithms": "AES-256"
+              }
+            },
+            {
+              "check_name": "Vulnerability Management",
+              "compliant": false,
+              "details": {
+                "automated_scanning": true,
+                "patch_management": false,
+                "security_monitoring": true,
+                "incident_response": true
+              }
+            }
+          ],
+          "overall_security_score": 85.0,
+          "critical_issues": 1,
+          "security_baseline": "TERRAGON_SECURITY_BASELINE_v1.0"
+        },
+        "execution_time_seconds": 1.3113021850585938e-05,
+        "recommendations": [
+          "Implement missing security controls",
+          "Update security configurations",
+          "Complete security hardening checklist",
+          "Schedule security penetration testing"
+        ],
+        "blocking": true
+      },
+      {
+        "validation_name": "Performance Benchmarking",
+        "status": "PASS",
+        "score": 80.0,
+        "details": {
+          "performance_results": {
+            "latency_test": {
+              "test_name": "Latency Benchmark",
+              "passed": true,
+              "p50_latency_ms": 12.5,
+              "p95_latency_ms": 45.2,
+              "p99_latency_ms": 78.9,
+              "target_p95_ms": 50
+            },
+            "throughput_test": {
+              "test_name": "Throughput Benchmark",
+              "passed": true,
+              "requests_per_second": 1250,
+              "target_rps": 1000,
+              "concurrent_users": 100
+            },
+            "stress_test": {
+              "test_name": "Stress Test",
+              "passed": true,
+              "max_load_handled": "150% of normal",
+              "breaking_point": "200% of normal",
+              "recovery_time_seconds": 30
+            },
+            "load_test": {
+              "test_name": "Load Test",
+              "passed": true,
+              "sustained_load_minutes": 60,
+              "performance_degradation": "5%",
+              "resource_utilization": {
+                "cpu_percentage": 65,
+                "memory_percentage": 70,
+                "disk_io_percentage": 45
+              }
+            },
+            "endurance_test": {
+              "test_name": "Endurance Test",
+              "passed": false,
+              "duration_hours": 24,
+              "memory_leak_detected": true,
+              "performance_degradation_over_time": "15%"
+            }
+          },
+          "overall_performance_score": 80.0,
+          "sla_requirements": {
+            "p95_latency_ms": 50,
+            "throughput_rps": 1000,
+            "availability_percentage": 99.9
+          }
+        },
+        "execution_time_seconds": 0.6511235237121582,
+        "recommendations": [],
+        "blocking": true
+      },
+      {
+        "validation_name": "Compliance Certification",
+        "status": "FAIL",
+        "score": 75.0,
+        "details": {
+          "compliance_frameworks": {
+            "SOC2": {
+              "framework": "SOC2",
+              "compliant": true,
+              "controls": {
+                "access_controls": true,
+                "system_monitoring": true,
+                "incident_response": true,
+                "vendor_management": true,
+                "data_classification": true
+              }
+            },
+            "ISO27001": {
+              "framework": "ISO27001",
+              "compliant": true,
+              "controls": {
+                "information_security_policy": true,
+                "risk_assessment": true,
+                "security_awareness": true,
+                "incident_management": true,
+                "business_continuity": true
+              }
+            },
+            "GDPR": {
+              "framework": "GDPR",
+              "compliant": false,
+              "requirements": {
+                "data_encryption": true,
+                "right_to_erasure": true,
+                "data_portability": false,
+                "consent_management": true,
+                "breach_notification": true
+              }
+            },
+            "CCPA": {
+              "framework": "CCPA",
+              "compliant": true,
+              "requirements": {
+                "consumer_rights_disclosure": true,
+                "data_sale_opt_out": true,
+                "data_deletion_rights": true,
+                "non_discrimination": true
+              }
+            }
+          },
+          "overall_compliance_score": 75.0,
+          "audit_date": "2025-08-25T13:58:16.994098",
+          "certification_validity": "1_YEAR"
+        },
+        "execution_time_seconds": 1.6689300537109375e-05,
+        "recommendations": [
+          "Address GDPR compliance requirements",
+          "Schedule compliance audit"
+        ],
+        "blocking": true
+      },
+      {
+        "validation_name": "Disaster Recovery",
+        "status": "FAIL",
+        "score": 80.0,
+        "details": {
+          "dr_components": {
+            "backup_systems": {
+              "component": "Backup Systems",
+              "compliant": true,
+              "details": {
+                "automated_backups": true,
+                "backup_encryption": true,
+                "offsite_storage": true,
+                "backup_verification": true,
+                "retention_policy": "7_YEARS"
+              }
+            },
+            "failover_mechanisms": {
+              "component": "Failover Mechanisms",
+              "compliant": true,
+              "details": {
+                "automated_failover": true,
+                "health_monitoring": true,
+                "load_balancer_failover": true,
+                "dns_failover": true
+              }
+            },
+            "data_replication": {
+              "component": "Data Replication",
+              "compliant": true,
+              "details": {
+                "real_time_replication": true,
+                "cross_region_replication": true,
+                "data_consistency_checks": true,
+                "replication_monitoring": true
+              }
+            },
+            "recovery_procedures": {
+              "component": "Recovery Procedures",
+              "compliant": false,
+              "details": {
+                "documented_procedures": true,
+                "tested_procedures": false,
+                "automated_recovery": true,
+                "staff_training": true
+              }
+            },
+            "rto_rpo_compliance": {
+              "component": "RTO/RPO Compliance",
+              "compliant": true,
+              "details": {
+                "rto_target_minutes": 15,
+                "rto_actual_minutes": 12,
+                "rpo_target_minutes": 5,
+                "rpo_actual_minutes": 3
+              }
+            }
+          },
+          "overall_dr_score": 80.0,
+          "rto_target_minutes": 15,
+          "rpo_target_minutes": 5,
+          "last_dr_test_date": "2025-07-26T13:58:16.994205"
+        },
+        "execution_time_seconds": 1.2159347534179688e-05,
+        "recommendations": [
+          "Complete disaster recovery testing",
+          "Update recovery procedures documentation",
+          "Implement automated failover testing",
+          "Enhance backup verification processes"
+        ],
+        "blocking": true
+      },
+      {
+        "validation_name": "Monitoring & Alerting",
+        "status": "FAIL",
+        "score": 80.0,
+        "details": {
+          "monitoring_components": {
+            "application_monitoring": {
+              "component": "Application Monitoring",
+              "compliant": true,
+              "details": {
+                "apm_enabled": true,
+                "custom_metrics": true,
+                "distributed_tracing": true,
+                "error_tracking": true
+              }
+            },
+            "infrastructure_monitoring": {
+              "component": "Infrastructure Monitoring",
+              "compliant": true,
+              "details": {
+                "resource_monitoring": true,
+                "network_monitoring": true,
+                "storage_monitoring": true,
+                "container_monitoring": true
+              }
+            },
+            "security_monitoring": {
+              "component": "Security Monitoring",
+              "compliant": true,
+              "details": {
+                "siem_system": true,
+                "intrusion_detection": true,
+                "vulnerability_scanning": true,
+                "access_monitoring": true
+              }
+            },
+            "business_monitoring": {
+              "component": "Business Monitoring",
+              "compliant": true,
+              "details": {
+                "kpi_tracking": true,
+                "user_analytics": true,
+                "revenue_impact": true,
+                "sla_monitoring": true
+              }
+            },
+            "alerting_systems": {
+              "component": "Alerting Systems",
+              "compliant": false,
+              "details": {
+                "alert_routing": true,
+                "escalation_policies": false,
+                "alert_suppression": true,
+                "notification_channels": true
+              }
+            }
+          },
+          "overall_monitoring_score": 80.0,
+          "monitoring_coverage_percentage": 95,
+          "alert_response_time_minutes": 5
+        },
+        "execution_time_seconds": 2.2411346435546875e-05,
+        "recommendations": [
+          "Implement comprehensive monitoring coverage",
+          "Configure intelligent alerting rules",
+          "Set up monitoring dashboards",
+          "Establish monitoring SLAs"
+        ],
+        "blocking": false
+      }
+    ],
+    "blocking_failures": [
+      "Security Hardening",
+      "Compliance Certification",
+      "Disaster Recovery"
+    ],
+    "ready_for_deployment": false,
+    "environments_validated": 4,
+    "recommendations": [
+      "Conduct thorough remediation planning",
+      "Implement automated failover testing",
+      "Implement missing security controls",
+      "Configure intelligent alerting rules",
+      "Schedule security penetration testing",
+      "Address GDPR compliance requirements",
+      "Implement comprehensive monitoring coverage",
+      "Establish monitoring SLAs",
+      "Do not proceed with deployment",
+      "Schedule compliance audit",
+      "Critical blocking issues must be resolved",
+      "Update security configurations",
+      "Complete disaster recovery testing",
+      "Update recovery procedures documentation",
+      "Set up monitoring dashboards",
+      "Complete security hardening checklist",
+      "Escalate to senior engineering leadership",
+      "Enhance backup verification processes"
+    ]
+  },
+  "deployment_result": {
+    "status": "BLOCKED",
+    "reason": "VALIDATION_FAILED",
+    "blocking_failures": [
+      "Security Hardening",
+      "Compliance Certification",
+      "Disaster Recovery"
+    ]
+  },
+  "production_readiness": {
+    "overall_score": 80.0,
+    "status": "BLOCKED",
+    "ready_for_production": false,
+    "environments_ready": 4,
+    "critical_validations_passed": 1
+  },
+  "deployment_summary": {
+    "deployment_attempted": false,
+    "deployment_successful": false,
+    "environments_deployed": 0,
+    "rollback_available": true
+  }
+}

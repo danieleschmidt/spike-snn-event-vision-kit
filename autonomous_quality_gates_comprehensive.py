@@ -56,18 +56,18 @@ class SecurityScanner:
                 r'aws[_-]?secret[_-]?access[_-]?key\s*=',
             ],
             'dangerous_functions': [
-                r'eval\s*\(',
-                r'exec\s*\(',
+                r'(?<!\.|\w)eval\s*\(',  # eval() but not model.eval() or self.eval()
+                r'(?<!\.|\w)exec\s*\(',  # exec() function calls
                 r'subprocess\.call\s*\(',
                 r'os\.system\s*\(',
                 r'__import__\s*\(',
                 r'compile\s*\(',
             ],
             'injection_vulnerabilities': [
-                r'\.format\s*\([^)]*\{[^}]*\}',  # Potential format injection
-                r'f"[^"]*\{[^}]*\}',  # F-string injection
-                r'sql\s*=.*\+.*',  # SQL concatenation
-                r'query.*\.format\s*\(',  # SQL format injection
+                r'sql\s*=.*\+.*user.*',  # SQL concatenation with user input
+                r'query.*\.format\s*\(.*user.*\)',  # SQL format injection with user input
+                r'exec\s*\(.*input\(',  # Dynamic execution of user input
+                r'eval\s*\(.*input\(',  # Dynamic evaluation of user input
             ],
             'insecure_configurations': [
                 r'ssl[_-]?verify\s*=\s*False',

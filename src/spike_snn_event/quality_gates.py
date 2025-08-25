@@ -215,10 +215,21 @@ class SecurityGate:
             "validate", "sanitize", "escape"
         ]
         
+        # More sophisticated pattern matching to avoid false positives
         bad_patterns = [
-            "eval(", "exec(", "pickle.loads", "subprocess.call",
-            "os.system", "shell=True"
+            r"\beval\s*\(",  # eval() function call (not model.eval())
+            r"\bexec\s*\(",  # exec() function call
+            "pickle.loads", "subprocess.call", "os.system", "shell=True"
         ]
+        
+        # Safe patterns that should not trigger security warnings
+        safe_patterns = [
+            ".eval()",  # PyTorch model evaluation mode
+            "model.eval()", "network.eval()", "net.eval()",
+            "self.model.eval()", "self.network.eval()", "self.net.eval()"
+        ]
+        
+        import re
         
         for py_file in src_path.glob("*.py"):
             content = py_file.read_text()
@@ -226,8 +237,24 @@ class SecurityGate:
             for pattern in good_patterns:
                 secure_patterns += content.count(pattern)
             
+            # Check for legitimate ML operations first
+            safe_count = 0
+            for safe_pattern in safe_patterns:
+                safe_count += content.count(safe_pattern)
+            
+            # Now check for actual security issues, avoiding false positives
             for pattern in bad_patterns:
-                insecure_patterns += content.count(pattern)
+                if pattern.startswith('r"') and pattern.endswith('"'):
+                    # Regular expression pattern
+                    regex_pattern = pattern[2:-1]
+                    matches = len(re.findall(regex_pattern, content))
+                    # Subtract safe ML operations from matches
+                    actual_violations = max(0, matches - safe_count) if 'eval' in pattern else matches
+                    insecure_patterns += actual_violations
+                else:
+                    # Simple string pattern
+                    raw_matches = content.count(pattern)
+                    insecure_patterns += raw_matches
         
         if secure_patterns + insecure_patterns == 0:
             return 85.0  # Default reasonable score

@@ -1,188 +1,214 @@
 {
-  "timestamp": 1755457547.2657907,
-  "status": "PASSED",
-  "overall_score": 100.0,
-  "gates_passed": 7,
-  "total_gates": 7,
-  "execution_time_seconds": 1.2050912380218506,
-  "quality_gates": {
-    "mandatory_passed": true,
-    "minimum_score_85": true,
-    "no_critical_failures": true
+  "timestamp": 1756129728.4990811,
+  "overall_status": "FAILED",
+  "overall_score": 0.6579062814257547,
+  "runtime_seconds": 3.568403482437134,
+  "gates_summary": {
+    "total_gates": 5,
+    "passed_gates": 2,
+    "failed_gates": 3,
+    "pass_rate": 0.4
   },
-  "gate_results": [
-    {
-      "name": "Code Execution",
-      "passed": true,
-      "score": 100.0,
-      "execution_time": 1.0109589099884033,
-      "details": {
-        "tests_run": 2,
-        "tests_passed": 2,
-        "test_results": [
-          {
-            "test": "Generation 1 Core",
-            "passed": true,
-            "details": "Processed 100 events to (5, 256, 256, 2)"
-          },
-          {
-            "test": "Event Streaming",
-            "passed": true,
-            "details": "Streamed 0 events in 1.0s"
-          }
-        ]
-      },
-      "error": null
+  "issues_summary": {
+    "total_issues": 63,
+    "total_warnings": 7,
+    "critical_issues": []
+  },
+  "execution_performance": {
+    "total_execution_time_ms": 8994.582414627075,
+    "execution_times_by_gate": {
+      "Dependency Vulnerability Scan": 0.9586811065673828,
+      "Performance Validation": 248.16441535949707,
+      "Comprehensive Testing": 2116.5590286254883,
+      "Security Vulnerability Scan": 3063.732147216797,
+      "Code Quality Analysis": 3565.1681423187256
     },
-    {
-      "name": "Unit Tests & Coverage",
+    "parallel_efficiency": 0.3967280878581047
+  },
+  "detailed_results": {
+    "Dependency Security Scan": {
+      "gate_name": "Dependency Vulnerability Scan",
       "passed": true,
-      "score": 100.0,
-      "execution_time": 0.0007464885711669922,
-      "details": {
-        "tests_run": 3,
-        "tests_passed": 3,
-        "coverage_percentage": 100.0,
-        "test_results": [
-          {
-            "name": "Event Validation",
-            "passed": true
-          },
-          {
-            "name": "Camera Configuration",
-            "passed": true
-          },
-          {
-            "name": "Error Handling",
-            "passed": true
-          }
-        ]
+      "score": 0.6,
+      "issues": [],
+      "warnings": [
+        "Could not parse requirements.txt: cannot access local variable 're' where it is not associated with a value",
+        "Potentially vulnerable dependency: pillow - versions < 8.3.2 have security issues",
+        "Potentially vulnerable dependency: pyyaml - versions < 5.4 have security issues"
+      ],
+      "metrics": {
+        "dependencies_found": 26,
+        "requirements_files": [
+          "requirements.txt",
+          "pyproject.toml"
+        ],
+        "dependency_analysis": {
+          "total_dependencies": 26,
+          "potentially_vulnerable": 2,
+          "vulnerable_packages": [
+            "pillow",
+            "pyyaml"
+          ]
+        }
       },
-      "error": null
+      "execution_time_ms": 0.9586811065673828
     },
-    {
-      "name": "Security Validation",
+    "Performance Validation": {
+      "gate_name": "Performance Validation",
       "passed": true,
-      "score": 100.0,
-      "execution_time": 0.0493929386138916,
-      "details": {
-        "tests_run": 2,
-        "tests_passed": 2,
-        "security_tests": [
-          {
-            "test": "Input Validation",
-            "passed": true,
-            "score": 100.0
-          },
-          {
-            "test": "Memory Safety",
-            "passed": true,
-            "details": "Processed 5000 events safely"
-          }
-        ]
+      "score": 1.0,
+      "issues": [],
+      "warnings": [],
+      "metrics": {
+        "startup_time_ms": 830.4704185606004,
+        "memory_usage_mb": 13.839,
+        "throughput_ops_sec": 3518202.370353417,
+        "response_time_ms": 14.33100700378418,
+        "performance_score": 1.0,
+        "benchmark_results": {}
       },
-      "error": null
+      "execution_time_ms": 248.16441535949707
     },
-    {
-      "name": "Performance Benchmarks",
-      "passed": true,
-      "score": 100.0,
-      "execution_time": 0.1343080997467041,
-      "details": {
-        "tests_run": 1,
-        "tests_passed": 1,
-        "performance_tests": [
-          {
-            "test": "Processing Latency",
-            "passed": true,
-            "avg_latency_ms": 26.596498489379883,
-            "target_ms": 100.0
-          }
-        ]
+    "Comprehensive Testing": {
+      "gate_name": "Comprehensive Testing",
+      "passed": false,
+      "score": 0.8895314071287737,
+      "issues": [
+        "20 tests failed"
+      ],
+      "warnings": [],
+      "metrics": {
+        "test_files_found": 16,
+        "test_functions_found": 171,
+        "tests_executed": 171,
+        "tests_passed": 151,
+        "tests_failed": 20,
+        "test_coverage_percent": 89.9267114313162,
+        "test_execution_time_ms": 15659.01803362316,
+        "test_categories": {
+          "unit": 171
+        }
       },
-      "error": null
+      "execution_time_ms": 2116.5590286254883
     },
-    {
-      "name": "Integration Tests",
-      "passed": true,
-      "score": 100.0,
-      "execution_time": 0.006134748458862305,
-      "details": {
-        "tests_run": 1,
-        "tests_passed": 1,
-        "integration_tests": [
-          {
-            "test": "Complete Pipeline",
-            "passed": true,
-            "processed_shape": [
-              5,
-              128,
-              96,
-              2
-            ],
-            "input_events": 500
-          }
+    "Security Vulnerability Scan": {
+      "gate_name": "Security Vulnerability Scan",
+      "passed": false,
+      "score": 0.0,
+      "issues": [
+        "Security vulnerability (dangerous_functions) in autonomous_quality_gates_comprehensive.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in autonomous_quality_gates_comprehensive.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in autonomous_quality_gates_final.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in autonomous_quality_gates_final.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in comprehensive_autonomous_sdlc_validation.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in comprehensive_autonomous_sdlc_validation.py: 2 matches found",
+        "Security vulnerability (dangerous_functions) in comprehensive_quality_gates_validation.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in comprehensive_quality_gates_validation.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in comprehensive_quality_gates_validation.py: 3 matches found",
+        "Security vulnerability (dangerous_functions) in progressive_generation_1_demo.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in progressive_generation_2_robust.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in robustness_test.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in tests/test_robust_integration.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/advanced_scaling.py: 2 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/health.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/models.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/quality_gates.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/quality_gates.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/security.py: 1 matches found",
+        "Security vulnerability (dangerous_functions) in src/spike_snn_event/security.py: 1 matches found"
+      ],
+      "warnings": [
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/security.py: 1 matches found",
+        "Potential security issue (injection_vulnerabilities) in src/spike_snn_event/security.py: 1 matches found"
+      ],
+      "metrics": {
+        "files_scanned": 129,
+        "total_patterns_checked": 2580,
+        "vulnerabilities_by_type": {
+          "dangerous_functions": 24,
+          "injection_vulnerabilities": 2,
+          "hardcoded_secrets": 0
+        },
+        "critical_files_found": [
+          "requirements.txt",
+          "pyproject.toml",
+          ".env.example"
         ]
       },
-      "error": null
+      "execution_time_ms": 3063.732147216797
     },
-    {
-      "name": "Documentation Validation",
-      "passed": true,
-      "score": 100.0,
-      "execution_time": 0.00024771690368652344,
-      "details": {
-        "tests_run": 2,
-        "tests_passed": 2,
-        "documentation_tests": [
-          {
-            "test": "Core Documentation",
-            "passed": true,
-            "has_class_docstring": true
-          },
-          {
-            "test": "README Documentation",
-            "passed": true,
-            "readme_exists": true,
-            "has_content": true
-          }
-        ]
+    "Code Quality Analysis": {
+      "gate_name": "Code Quality Analysis",
+      "passed": false,
+      "score": 0.8,
+      "issues": [
+        "High complexity in adaptive_generation_2_robust.py: 5 violations",
+        "High complexity in adaptive_generation_3_scaling.py: 6 violations",
+        "High complexity in advanced_neuromorphic_research_demo.py: 12 violations",
+        "High complexity in autonomous_production_deployment.py: 14 violations",
+        "High complexity in autonomous_quality_gates_comprehensive.py: 11 violations",
+        "High complexity in autonomous_quality_gates_final.py: 11 violations",
+        "High complexity in comprehensive_autonomous_sdlc_validation.py: 13 violations",
+        "High complexity in comprehensive_quality_gates.py: 13 violations",
+        "High complexity in comprehensive_quality_gates_validation.py: 10 violations",
+        "High complexity in demo_autonomous_gen1.py: 4 violations",
+        "High complexity in demo_autonomous_gen2_robust.py: 17 violations",
+        "High complexity in demo_autonomous_gen3_scaling.py: 9 violations",
+        "High complexity in demo_robust.py: 4 violations",
+        "High complexity in generation_5_adaptive_intelligence_system.py: 5 violations",
+        "High complexity in global_production_deployment.py: 6 violations",
+        "High complexity in high_performance_neuromorphic_system_demo.py: 5 violations",
+        "High complexity in lightweight_neuromorphic_breakthrough_demo.py: 6 violations",
+        "High complexity in performance_benchmark_suite.py: 7 violations",
+        "High complexity in production_deployment_final.py: 6 violations",
+        "High complexity in production_deployment_global.py: 8 violations",
+        "High complexity in quality_gates_final_clean.py: 9 violations",
+        "High complexity in quality_gates_validation.py: 4 violations",
+        "High complexity in research_adaptive_neuromorphic_breakthrough.py: 4 violations",
+        "High complexity in research_benchmarking_framework.py: 6 violations",
+        "High complexity in research_breakthrough_numpy_implementation.py: 4 violations",
+        "High complexity in research_breakthrough_snn_algorithms.py: 7 violations",
+        "High complexity in research_final_report.py: 6 violations",
+        "High complexity in research_novel_snn_architectures.py: 4 violations",
+        "High complexity in research_validation_demo.py: 4 violations",
+        "High complexity in robustness_test.py: 8 violations",
+        "High complexity in simplified_quality_gates.py: 7 violations",
+        "High complexity in autonomous_gen2_robust_system.py: 4 violations",
+        "High complexity in autonomous_gen3_scaling_system.py: 9 violations",
+        "High complexity in examples/advanced_scaling.py: 6 violations",
+        "High complexity in src/spike_snn_event/advanced_scaling.py: 4 violations",
+        "High complexity in src/spike_snn_event/advanced_telemetry.py: 5 violations",
+        "High complexity in src/spike_snn_event/advanced_validation.py: 5 violations",
+        "High complexity in src/spike_snn_event/cli.py: 8 violations",
+        "High complexity in src/spike_snn_event/core.py: 8 violations",
+        "High complexity in src/spike_snn_event/intelligent_cache.py: 4 violations",
+        "High complexity in src/spike_snn_event/quality_gates.py: 6 violations",
+        "Too many complexity violations: 399"
+      ],
+      "warnings": [
+        "Style issues in autonomous_production_deployment.py: 17 violations",
+        "Style issues in src/spike_snn_event/validation.py: 22 violations"
+      ],
+      "metrics": {
+        "files_analyzed": 129,
+        "total_lines": 78042,
+        "total_functions": 2561,
+        "complexity_violations": 399,
+        "style_violations": 162,
+        "maintainability_score": 0.6572083609416239,
+        "quality_breakdown": {
+          "complexity_score": 0.3441275757602667,
+          "style_score": 0.9702891461229812,
+          "violations_per_file": 4.348837209302325
+        }
       },
-      "error": null
-    },
-    {
-      "name": "Production Readiness",
-      "passed": true,
-      "score": 100.0,
-      "execution_time": 0.0016019344329833984,
-      "details": {
-        "tests_run": 2,
-        "tests_passed": 2,
-        "readiness_tests": [
-          {
-            "test": "Configuration Management",
-            "passed": true,
-            "config_applied": true
-          },
-          {
-            "test": "Health Monitoring",
-            "passed": true,
-            "has_status": true,
-            "has_metrics": true,
-            "has_timestamp": true
-          }
-        ]
-      },
-      "error": null
+      "execution_time_ms": 3565.1681423187256
     }
-  ],
-  "summary": {
-    "code_execution": true,
-    "test_coverage": true,
-    "security_validation": true,
-    "performance_benchmarks": true,
-    "integration_tests": true,
-    "documentation": true,
-    "production_ready": true
-  }
+  },
+  "recommendations": [
+    "Address security vulnerabilities before production deployment",
+    "Implement automated security scanning in CI/CD pipeline",
+    "Increase test coverage to at least 80%",
+    "Add integration and performance tests"
+  ]
 }
