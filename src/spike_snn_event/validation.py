@@ -29,15 +29,21 @@ class SpikeNNError(Exception):
     pass
 
 
-class ValidationError:
-    """Validation error information."""
+class ValidationError(SpikeNNError):
+    """Raised when validation fails"""
     
     def __init__(self, code: str, message: str, field: Optional[str] = None, value: Any = None, severity: str = "error"):
+        super().__init__(message)
         self.code = code
         self.message = message
         self.field = field
         self.value = value
         self.severity = severity
+
+
+class ConfigurationError(SpikeNNError):
+    """Raised when configuration is invalid"""
+    pass
 
 
 class HardwareError(SpikeNNError):
@@ -1158,3 +1164,10 @@ def safe_operation(operation_func, *args, **kwargs):
     except Exception as e:
         logging.error(f"Operation failed: {e}")
         return None
+
+
+def validate_file_path(path: str, allowed_dirs=None):
+    """Standalone function for file path validation."""
+    validator = SecurityValidator()
+    return validator.validate_file_path(path, allowed_dirs)
+
