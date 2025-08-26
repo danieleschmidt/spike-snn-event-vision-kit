@@ -1,9 +1,9 @@
 {
-  "execution_timestamp": "2025-08-25T13:53:03.954800+00:00",
+  "execution_timestamp": "2025-08-26T13:37:03.701402+00:00",
   "deployment_result": {
-    "deployment_id": "014d2aa0-6783-4c99-b22d-6c0cb9eff36d",
-    "timestamp": "2025-08-25T13:53:03.911233+00:00",
-    "deployment_duration_seconds": 0.0003478527069091797,
+    "deployment_id": "28bade68-9fa4-446e-94ab-cda5d0cabb09",
+    "timestamp": "2025-08-26T13:37:03.655312+00:00",
+    "deployment_duration_seconds": 0.00044274330139160156,
     "target_regions": [
       "us-east-1",
       "eu-west-1",
@@ -29,7 +29,7 @@
       }
     },
     "edge_optimization": {
-      "optimization_timestamp": "2025-08-25T13:53:03.911196+00:00",
+      "optimization_timestamp": "2025-08-26T13:37:03.655266+00:00",
       "total_regions": 4,
       "deployment_results": {
         "us-east-1": {
@@ -157,7 +157,7 @@
                 "Implement ACCESS_CONTROLS control",
                 "Implement VENDOR_MANAGEMENT control"
               ],
-              "last_audit": "2025-08-25T13:53:03.911244+00:00"
+              "last_audit": "2025-08-26T13:37:03.655326+00:00"
             },
             "CCPA": {
               "framework": "California Consumer Privacy Act",
@@ -168,7 +168,7 @@
               "recommendations": [
                 "Implement PRIVACY_POLICY_UPDATES control"
               ],
-              "last_audit": "2025-08-25T13:53:03.911250+00:00"
+              "last_audit": "2025-08-26T13:37:03.655333+00:00"
             }
           },
           "violations": [
@@ -181,7 +181,7 @@
             "Implement VENDOR_MANAGEMENT control",
             "Implement PRIVACY_POLICY_UPDATES control"
           ],
-          "audit_timestamp": "2025-08-25T13:53:03.911253+00:00"
+          "audit_timestamp": "2025-08-26T13:37:03.655336+00:00"
         },
         "eu-west-1": {
           "region_code": "eu-west-1",
@@ -196,7 +196,7 @@
               "recommendations": [
                 "Implement PSEUDONYMIZATION control"
               ],
-              "last_audit": "2025-08-25T13:53:03.911260+00:00"
+              "last_audit": "2025-08-26T13:37:03.655343+00:00"
             },
             "SOC2": {
               "framework": "Service Organization Control 2",
@@ -209,7 +209,7 @@
                 "Implement ACCESS_CONTROLS control",
                 "Implement VENDOR_MANAGEMENT control"
               ],
-              "last_audit": "2025-08-25T13:53:03.911266+00:00"
+              "last_audit": "2025-08-26T13:37:03.655350+00:00"
             }
           },
           "violations": [
@@ -222,7 +222,7 @@
             "Implement ACCESS_CONTROLS control",
             "Implement VENDOR_MANAGEMENT control"
           ],
-          "audit_timestamp": "2025-08-25T13:53:03.911269+00:00"
+          "audit_timestamp": "2025-08-26T13:37:03.655353+00:00"
         },
         "ap-southeast-1": {
           "region_code": "ap-southeast-1",
@@ -239,7 +239,7 @@
                 "Implement ACCESS_CONTROLS control",
                 "Implement VENDOR_MANAGEMENT control"
               ],
-              "last_audit": "2025-08-25T13:53:03.911276+00:00"
+              "last_audit": "2025-08-26T13:37:03.655360+00:00"
             }
           },
           "violations": [
@@ -250,7 +250,7 @@
             "Implement ACCESS_CONTROLS control",
             "Implement VENDOR_MANAGEMENT control"
           ],
-          "audit_timestamp": "2025-08-25T13:53:03.911278+00:00"
+          "audit_timestamp": "2025-08-26T13:37:03.655363+00:00"
         },
         "ca-central-1": {
           "region_code": "ca-central-1",
@@ -267,7 +267,7 @@
                 "Implement ACCESS_CONTROLS control",
                 "Implement VENDOR_MANAGEMENT control"
               ],
-              "last_audit": "2025-08-25T13:53:03.911285+00:00"
+              "last_audit": "2025-08-26T13:37:03.655368+00:00"
             }
           },
           "violations": [
@@ -278,7 +278,7 @@
             "Implement ACCESS_CONTROLS control",
             "Implement VENDOR_MANAGEMENT control"
           ],
-          "audit_timestamp": "2025-08-25T13:53:03.911288+00:00"
+          "audit_timestamp": "2025-08-26T13:37:03.655372+00:00"
         }
       },
       "cross_border_data_flow": {},
@@ -392,8 +392,8 @@
     }
   },
   "compliance_report": {
-    "report_id": "03d45727-a3e1-4790-bd53-fcfa576a7bf7",
-    "generated_at": "2025-08-25T13:53:03.954052+00:00",
+    "report_id": "74449740-21ef-4842-9fb8-bc498741f7d6",
+    "generated_at": "2025-08-26T13:37:03.700518+00:00",
     "reporting_period": "30_days",
     "deployed_regions": [],
     "compliance_status": {
@@ -408,18 +408,18 @@
         "INFERENCE_REQUEST": 4
       },
       "regions_with_activity": [
-        "ap-southeast-1",
+        "eu-west-1",
         "us-east-1",
-        "eu-west-1"
+        "ap-southeast-1"
       ]
     },
     "audit_trail": [
       {
-        "timestamp": "2025-08-25T13:53:03.922117+00:00",
+        "timestamp": "2025-08-26T13:37:03.666802+00:00",
         "event_type": "DATA_PROCESSING",
         "details": {
-          "activity_id": "a8faeefa-8d58-4a90-8840-b2fa56909bfd",
-          "timestamp": "2025-08-25T13:53:03.922117+00:00",
+          "activity_id": "aebb2916-bf7e-467b-a36f-c1048ccde4ee",
+          "timestamp": "2025-08-26T13:37:03.666802+00:00",
           "activity": "INFERENCE_REQUEST",
           "data_types": [
             "input_events",
@@ -431,11 +431,11 @@
         }
       },
       {
-        "timestamp": "2025-08-25T13:53:03.930785+00:00",
+        "timestamp": "2025-08-26T13:37:03.675886+00:00",
         "event_type": "DATA_PROCESSING",
         "details": {
-          "activity_id": "78d71331-4c78-4437-9ac2-be50f3d82630",
-          "timestamp": "2025-08-25T13:53:03.930785+00:00",
+          "activity_id": "d7c1cbe0-c9c3-4b9f-afa0-0a06446116e0",
+          "timestamp": "2025-08-26T13:37:03.675886+00:00",
           "activity": "INFERENCE_REQUEST",
           "data_types": [
             "input_events",
@@ -447,11 +447,11 @@
         }
       },
       {
-        "timestamp": "2025-08-25T13:53:03.943371+00:00",
+        "timestamp": "2025-08-26T13:37:03.689120+00:00",
         "event_type": "DATA_PROCESSING",
         "details": {
-          "activity_id": "c46931be-705e-4b12-9210-47a1ab2f24bf",
-          "timestamp": "2025-08-25T13:53:03.943371+00:00",
+          "activity_id": "3e03dd2a-face-43e2-9545-792b9447f218",
+          "timestamp": "2025-08-26T13:37:03.689120+00:00",
           "activity": "INFERENCE_REQUEST",
           "data_types": [
             "input_events",
@@ -463,11 +463,11 @@
         }
       },
       {
-        "timestamp": "2025-08-25T13:53:03.953927+00:00",
+        "timestamp": "2025-08-26T13:37:03.700304+00:00",
         "event_type": "DATA_PROCESSING",
         "details": {
-          "activity_id": "f88a7565-7610-4e30-aae0-d92a01718192",
-          "timestamp": "2025-08-25T13:53:03.953927+00:00",
+          "activity_id": "e5af0858-5616-404e-ae37-12e579dac0a7",
+          "timestamp": "2025-08-26T13:37:03.700304+00:00",
           "activity": "INFERENCE_REQUEST",
           "data_types": [
             "input_events",
@@ -813,7 +813,7 @@
     }
   },
   "performance_metrics": {
-    "average_deployment_time": 0.0003478527069091797,
+    "average_deployment_time": 0.00044274330139160156,
     "regions_deployed": 4,
     "compliance_checks_passed": 0
   }

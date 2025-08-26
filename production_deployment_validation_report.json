@@ -1,13 +1,13 @@
 {
-  "report_id": "cb93cc30-197e-4434-b095-b0184e89d3f8",
-  "timestamp": "2025-08-25T13:58:16.995039+00:00",
+  "report_id": "c0f275d1-a020-4881-8221-79147b6c53fd",
+  "timestamp": "2025-08-26T13:36:52.207514+00:00",
   "terragon_sdlc_version": "4.0.0",
   "validation_result": {
-    "validation_id": "b1500310-7ca3-4840-b5c5-4264404c267b",
-    "timestamp": "2025-08-25T13:58:16.994515+00:00",
+    "validation_id": "618b76b2-ef62-4c4b-8bf3-fba7fd2dafb8",
+    "timestamp": "2025-08-26T13:36:52.206116+00:00",
     "overall_status": "BLOCKED",
     "overall_score": 80.0,
-    "total_execution_time_seconds": 0.6520118713378906,
+    "total_execution_time_seconds": 0.6740427017211914,
     "validation_results": [
       {
         "validation_name": "Security Hardening",
@@ -80,7 +80,7 @@
           "critical_issues": 1,
           "security_baseline": "TERRAGON_SECURITY_BASELINE_v1.0"
         },
-        "execution_time_seconds": 1.3113021850585938e-05,
+        "execution_time_seconds": 1.6927719116210938e-05,
         "recommendations": [
           "Implement missing security controls",
           "Update security configurations",
@@ -143,7 +143,7 @@
             "availability_percentage": 99.9
           }
         },
-        "execution_time_seconds": 0.6511235237121582,
+        "execution_time_seconds": 0.6728696823120117,
         "recommendations": [],
         "blocking": true
       },
@@ -198,10 +198,10 @@
             }
           },
           "overall_compliance_score": 75.0,
-          "audit_date": "2025-08-25T13:58:16.994098",
+          "audit_date": "2025-08-26T13:36:52.205570",
           "certification_validity": "1_YEAR"
         },
-        "execution_time_seconds": 1.6689300537109375e-05,
+        "execution_time_seconds": 2.3365020751953125e-05,
         "recommendations": [
           "Address GDPR compliance requirements",
           "Schedule compliance audit"
@@ -269,9 +269,9 @@
           "overall_dr_score": 80.0,
           "rto_target_minutes": 15,
           "rpo_target_minutes": 5,
-          "last_dr_test_date": "2025-07-26T13:58:16.994205"
+          "last_dr_test_date": "2025-07-27T13:36:52.205748"
         },
-        "execution_time_seconds": 1.2159347534179688e-05,
+        "execution_time_seconds": 3.218650817871094e-05,
         "recommendations": [
           "Complete disaster recovery testing",
           "Update recovery procedures documentation",
@@ -341,7 +341,7 @@
           "monitoring_coverage_percentage": 95,
           "alert_response_time_minutes": 5
         },
-        "execution_time_seconds": 2.2411346435546875e-05,
+        "execution_time_seconds": 1.4543533325195312e-05,
         "recommendations": [
           "Implement comprehensive monitoring coverage",
           "Configure intelligent alerting rules",
@@ -359,24 +359,24 @@
     "ready_for_deployment": false,
     "environments_validated": 4,
     "recommendations": [
-      "Conduct thorough remediation planning",
-      "Implement automated failover testing",
-      "Implement missing security controls",
-      "Configure intelligent alerting rules",
-      "Schedule security penetration testing",
-      "Address GDPR compliance requirements",
-      "Implement comprehensive monitoring coverage",
-      "Establish monitoring SLAs",
-      "Do not proceed with deployment",
-      "Schedule compliance audit",
-      "Critical blocking issues must be resolved",
-      "Update security configurations",
       "Complete disaster recovery testing",
+      "Update security configurations",
+      "Complete security hardening checklist",
+      "Do not proceed with deployment",
+      "Implement missing security controls",
+      "Schedule security penetration testing",
       "Update recovery procedures documentation",
       "Set up monitoring dashboards",
-      "Complete security hardening checklist",
+      "Critical blocking issues must be resolved",
+      "Conduct thorough remediation planning",
+      "Implement comprehensive monitoring coverage",
+      "Configure intelligent alerting rules",
+      "Implement automated failover testing",
+      "Establish monitoring SLAs",
       "Escalate to senior engineering leadership",
-      "Enhance backup verification processes"
+      "Address GDPR compliance requirements",
+      "Enhance backup verification processes",
+      "Schedule compliance audit"
     ]
   },
   "deployment_result": {
